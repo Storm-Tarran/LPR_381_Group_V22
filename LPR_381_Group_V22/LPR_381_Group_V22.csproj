@@ -53,6 +53,7 @@
     <Compile Include="SensitivityAnalysis\SensitivityAnalyzer.cs" />
     <Compile Include="Simplex\PrimalSimplexSolver.cs" />
     <Compile Include="Simplex\RevisedPrimalSimplexSolver.cs" />
+    <Compile Include="Utilities\CanonicalFormConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
