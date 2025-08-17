@@ -6,17 +6,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using LPR_381_Group_V22.Simplex;
-using LPR_381_Group_V22.IO;
+using LPR_381_Group_V22.IntegerProgramming;
 using LPR_381_Group_V22.Utilities;
 
 namespace LPR_381_Group_V22
 {
     internal class Program
     {
+        
         static void Main(string[] args)
         {
             InputFileParser inputFileParser = new InputFileParser();
             bool fileLoaded = false;
+            bool demo = false;
 
             while (!fileLoaded)
             {
@@ -24,27 +26,47 @@ namespace LPR_381_Group_V22
                 Console.WriteLine("=== Linear & Integer Programming Solver ===");
                 Console.WriteLine("Please enter the name of your file (eg. Myquestionfile.txt): ");
                 string filePath = Console.ReadLine();
-
-                // Checking in the data folder, not in the root folder
-                string mainPath = AppDomain.CurrentDomain.BaseDirectory;
-                string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
-                string fullPath = Path.Combine(projectRoot, "data", filePath);
-
-                inputFileParser.ReadInputFile(fullPath);
-                if(inputFileParser.ProblemType != null)
-                {
-                    fileLoaded = true;
-                    Console.WriteLine("File loaded successfully.");
+                string fullPath=null;
+                if (string.IsNullOrEmpty(filePath))
+                { 
+                    demo= true;
+                    filePath = "textfile.txt";
+                    string mainPath = AppDomain.CurrentDomain.BaseDirectory;
+                    string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
+                    fullPath = Path.Combine(projectRoot, "TextFile", filePath);
                 }
                 else
                 {
-                    Console.WriteLine("Error reading file. Please ensure the file is formatted correctly and try again.");
-                    Console.WriteLine("Press any key to continue...");
-                    Console.ReadKey();
+                // Checking in the data folder, not in the root folder
+                string mainPath = AppDomain.CurrentDomain.BaseDirectory;
+                string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
+                fullPath = Path.Combine(projectRoot, "data", filePath);
+                }
+
+                if (!demo)
+                {
+                    inputFileParser.ReadInputFile(fullPath);
+                    if (inputFileParser.ProblemType != null)
+                    {
+                        fileLoaded = true;
+                        Console.WriteLine("File loaded successfully.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error reading file. Please ensure the file is formatted correctly and try again.");
+                        Console.WriteLine("Press any key to continue...");
+                        Console.ReadKey();
+                    }
+                }
+                else
+                {
+                    fileLoaded = true;
                 }
             }
+            
             string solverUsed = "";
-            bool isMinimization = inputFileParser.ProblemType.ToLower() == "min";
+            bool isMinimization = inputFileParser.ProblemType?.ToLower() == "min" || inputFileParser.ProblemType?.ToLower() == null;
+            
             // This is the main menu
             bool exit = false;
             while (!exit)
@@ -124,6 +146,10 @@ namespace LPR_381_Group_V22
 
                     case "4":
                         Console.WriteLine("Solving with Cutting Plane Algorithm...");
+                        var cuttingPlane = new CuttingPlaneSolver();
+                        //get objrow and constraints from primal simplex
+                        //cuttingPlane.CuttingPlaneSolution(objectiveRowtemp, constraintRowstemp);
+
                         break;
 
                     case "5":
