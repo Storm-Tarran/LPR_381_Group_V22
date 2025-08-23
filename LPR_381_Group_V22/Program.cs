@@ -145,10 +145,23 @@ namespace LPR_381_Group_V22
                         break;
 
                     case "4":
-                        Console.WriteLine("Solving with Cutting Plane Algorithm...");
-                        var cuttingPlane = new CuttingPlaneSolver();
+
+                    Console.WriteLine("Solving with Cutting Plane Algorithm...");
+
+                    double[] objectiveRowtemp = new double[] { 0.2, 0, 0, 0, 0, 0, 0.2, 0, 1.4, 1.8, 2.2, 0, 2, 15.4};
+                    List<double[]> constraintRowstemp = new List<double[]>
+                    {
+                        new double[] {  1.1, 0,   0,   0, 1, 0,  0.1, 0, -0.8, -0.6, -1.4, 0,  -1, 0.2 },
+                        new double[] {  1,   0,   0,   0, 0, 0,  0,   1,  0,    0,    0,    0,   0,  1   },
+                        new double[] {  0,   1,   0,   0, 0, 0,  0,   0,  1,    0,    0,    0,   0,  1   },
+                        new double[] {  0,   0,   1,   0, 0, 0,  0,   0,  0,    1,    0,    0,   0,  1   },
+                        new double[] {  0,   0,   0,   1, 0, 0,  0,   0,  0,    0,    1,    0,   0,  1   },
+                        new double[] { -1.1, 0,   0,   0, 0, 0, -0.1, 0,  0.8,  0.6,  1.4,  1,   1,  0.8 },
+                        new double[] {  0,   0,   0,   0, 0, 1,  0,   0,  0,    0,    0,    0,   1,  1   }
+                    };
+                    var cuttingPlane = new CuttingPlaneSolver();
                         //get objrow and constraints from primal simplex
-                        //cuttingPlane.CuttingPlaneSolution(objectiveRowtemp, constraintRowstemp);
+                        cuttingPlane.CuttingPlaneSolution(objectiveRowtemp, constraintRowstemp);
 
                         break;
 

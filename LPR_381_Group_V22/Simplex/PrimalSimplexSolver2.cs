@@ -19,27 +19,27 @@ namespace LPR_381_Group_V22.Simplex
 
         /// <summary>
         /// Build directly from a complete tableau:
-        /// objectiveRow length == each constraint row length; last entry is RHS.
+        /// orow length == each constraint row length; last entry is RHS.
         /// </summary>
-        public PrimalSimplexSolver2(double[] objectiveRow, List<double[]> constraintRows)
+        public PrimalSimplexSolver2(double[] orow, List<double[]> crows)
         {
-            if (objectiveRow == null) throw new ArgumentNullException(nameof(objectiveRow));
-            if (constraintRows == null || constraintRows.Count == 0) throw new ArgumentException("No constraint rows.");
-            int w = objectiveRow.Length;
-            if (constraintRows.Any(r => r.Length != w))
+            if (orow == null) throw new ArgumentNullException(nameof(orow));
+            if (crows == null || crows.Count == 0) throw new ArgumentException("No constraint rows.");
+            int w = orow.Length;
+            if (crows.Any(r => r.Length != w))
                 throw new ArgumentException("All rows (obj & constraints) must have the same length.");
 
-            rows = constraintRows.Count + 1;
+            rows = crows.Count + 1;
             cols = w;
             tableau = new double[rows, cols];
 
             // Copy objective (assume already negated for max if needed)
-            for (int j = 0; j < cols; j++) tableau[0, j] = objectiveRow[j];
+            for (int j = 0; j < cols; j++) tableau[0, j] = orow[j];
 
             // Copy constraints
-            for (int i = 0; i < constraintRows.Count; i++)
+            for (int i = 0; i < crows.Count; i++)
                 for (int j = 0; j < cols; j++)
-                    tableau[i + 1, j] = constraintRows[i][j];
+                    tableau[i + 1, j] = crows[i][j];
         }
 
         /// <summary>Classic primal simplex. Returns true if optimal reached.</summary>
@@ -190,7 +190,7 @@ namespace LPR_381_Group_V22.Simplex
 
         // ---------- Getters ----------
 
-        public double[] GetObjectiveRow(bool solveIfNeeded = true)
+        public double[] Getorow(bool solveIfNeeded = true)
         {
             EnsureReady(solveIfNeeded);
             var row = new double[cols];
@@ -198,7 +198,7 @@ namespace LPR_381_Group_V22.Simplex
             return row;
         }
 
-        public List<double[]> GetConstraintRows(bool solveIfNeeded = true)
+        public List<double[]> Getcrows(bool solveIfNeeded = true)
         {
             EnsureReady(solveIfNeeded);
             var list = new List<double[]>(rows - 1);
@@ -211,10 +211,10 @@ namespace LPR_381_Group_V22.Simplex
             return list;
         }
 
-        public (double[] ObjectiveRow, List<double[]> ConstraintRows) GetRows(bool solveIfNeeded = true)
+        public (double[] orow, List<double[]> crows) GetRows(bool solveIfNeeded = true)
         {
             EnsureReady(solveIfNeeded);
-            return (GetObjectiveRow(false), GetConstraintRows(false));
+            return (Getorow(false), Getcrows(false));
         }
 
         private void EnsureReady(bool solveIfNeeded)

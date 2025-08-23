@@ -7,12 +7,12 @@ namespace LPR_381_Group_V22.IntegerProgramming
 {
     public class CuttingPlaneSolver
     {
-        private const double EPS = 1e-9;
+        private const double IntegerRounder = 1e-9;
 
         private static double Frac(double a)
         {
             double f = a - Math.Floor(a);
-            if (Math.Abs(f) < EPS || Math.Abs(1 - f) < EPS) return 0.0; // treat ~integers as 0 frac
+            if (Math.Abs(f) < IntegerRounder || Math.Abs(1 - f) < IntegerRounder) return 0.0;
             return f;
         }
 
@@ -20,7 +20,7 @@ namespace LPR_381_Group_V22.IntegerProgramming
         {
             // all reduced costs (except RHS) >= 0
             for (int j = 0; j < obj.Length - 1; j++)
-                if (obj[j] < -EPS) return false;
+                if (obj[j] < -IntegerRounder) return false;
             return true;
         }
 
@@ -29,7 +29,7 @@ namespace LPR_381_Group_V22.IntegerProgramming
             for (int i = 0; i < rows.Count; i++)
             {
                 double rhs = rows[i][rows[i].Length - 1];
-                if (rhs < -EPS) return true;
+                if (rhs < -IntegerRounder) return true;
             }
             return false;
         }
@@ -39,7 +39,7 @@ namespace LPR_381_Group_V22.IntegerProgramming
             for (int i = 0; i < rows.Count; i++)
             {
                 double rhs = rows[i][rows[i].Length - 1];
-                if (Frac(rhs) > EPS) return true;
+                if (Frac(rhs) > IntegerRounder) return true;
             }
             return false;
         }
@@ -52,172 +52,139 @@ namespace LPR_381_Group_V22.IntegerProgramming
                 Console.WriteLine($"r{i + 1}: " + string.Join("\t", rows[i].Select(v => v.ToString("0.####"))));
             Console.WriteLine();
         }
-
-        /// <summary>
-        /// One Gomory fractional cut iteration:
-        /// - Choose a constraint with fractional RHS (closest to 0.5),
-        /// - Add cut = -frac(row),
-        /// - Pivot on that cut using smallest NON-ZERO |obj[j]/cut[j]| with cut[j] < 0,
-        /// - If needed, run Dual Simplex (fix negative RHS) then Primal Simplex (optimize).
-        /// Mutates objectiveRow and constraintRows in-place.
-        /// </summary>
-        public void CuttingPlaneSolution(double[] objectiveRow, List<double[]> constraintRows)
+        public void CuttingPlaneSolution(double[] orow, List<double[]> crows)
         {
-            // Sanity
-            if (objectiveRow == null) throw new ArgumentNullException("objectiveRow");
-            if (constraintRows == null || constraintRows.Count == 0) throw new ArgumentException("No constraint rows.");
-            int width = objectiveRow.Length;
-            for (int i = 0; i < constraintRows.Count; i++)
-                if (constraintRows[i].Length != width)
-                    throw new ArgumentException("All rows (objective & constraints) must have the same length.");
+            if (orow == null) throw new ArgumentNullException("orow");
+            if (crows == null || crows.Count == 0) throw new ArgumentException("No constraint rows.");
+            int width = orow.Length;
+            for (int i = 0; i < crows.Count; i++)
+                if (crows[i].Length != width)
+                    throw new ArgumentException("All rows  must have the same length.");
 
-            PrintTableau("Initial tableau:", objectiveRow, constraintRows);
-
-            // 1) rows with fractional RHS
-            var fractional = new List<Tuple<int, double[], double, double>>(); // (idx, row, rhs, rhsFrac)
-            for (int i = 0; i < constraintRows.Count; i++)
+            PrintTableau("Initial tableau:", orow, crows);
+            var fractional = new List<Tuple<int, double[], double, double>>();
+            for (int i = 0; i < crows.Count; i++)
             {
-                double[] row = constraintRows[i];
+                double[] row = crows[i];
                 double rhs = row[row.Length - 1];
                 double rhsFrac = Frac(rhs);
-                if (rhsFrac > EPS)
+                if (rhsFrac > IntegerRounder)
                     fractional.Add(Tuple.Create(i, row, rhs, rhsFrac));
             }
 
             if (fractional.Count == 0)
             {
-                Console.WriteLine("All RHS are integers. No Gomory cut needed.");
+                Console.WriteLine("All RHS are integers.");
                 return;
             }
-
-            // 2) pick RHS frac closest to 0.5
-            fractional.Sort((a, b) =>
-                Math.Abs(a.Item4 - 0.5).CompareTo(Math.Abs(b.Item4 - 0.5)));
+            fractional.Sort((a, b) => Math.Abs(a.Item4 - 0.5).CompareTo(Math.Abs(b.Item4 - 0.5)));
             var chosen = fractional[0];
             int n = chosen.Item2.Length;
-
-            // 3) fractional parts of chosen row
             var frac = new double[n];
             for (int j = 0; j < n; j++)
+            {
                 frac[j] = Frac(chosen.Item2[j]);
-
-            // 4) build cut = -frac(row), including RHS
+            }
             var cut = new double[n];
             for (int j = 0; j < n - 1; j++) cut[j] = -frac[j];
             cut[n - 1] = -frac[n - 1];
-
-            // 5) append cut
-            constraintRows.Add(cut);
-            int cutRowIdx = constraintRows.Count - 1;
-
-            // 6) choose pivot column on the cut row (negative entries only), smallest NON-ZERO |obj[j]/cut[j]|
-            int pivotCol = -1;
+            crows.Add(cut);
+            int rowCutIndex = crows.Count - 1;
+            int pcol = -1;
             double bestRatio = double.PositiveInfinity;
+
             for (int j = 0; j < n - 1; j++)
             {
                 double a = cut[j];
-                if (a < -EPS)
+                if (a < -IntegerRounder)
                 {
-                    double num = objectiveRow[j];
-                    if (Math.Abs(num) > EPS) // ensure ratio is not zero
+                    double num = orow[j];
+                    if (Math.Abs(num) > IntegerRounder) 
                     {
                         double ratio = Math.Abs(num / a);
-                        if (ratio < bestRatio - EPS || (Math.Abs(ratio - bestRatio) <= EPS && (pivotCol == -1 || j < pivotCol)))
+                        if (ratio < bestRatio - IntegerRounder || (Math.Abs(ratio - bestRatio) <= IntegerRounder && (pcol == -1 || j < pcol)))
                         {
                             bestRatio = ratio;
-                            pivotCol = j;
+                            pcol = j;
                         }
                     }
                 }
             }
 
-            if (pivotCol == -1)
+            if (pcol == -1)
             {
-                Console.WriteLine("No valid pivot column on the cut (need a negative cut coeff with non-zero obj coeff).");
+                Console.WriteLine("No valid pivot column on the cut .");
                 return;
             }
+            PrintTableau(string.Format("Before pivot on cut: row {0}, col {1}", rowCutIndex + 1, pcol + 1),orow, crows);
 
-            // 7) pivot on (cutRowIdx, pivotCol)
-            PrintTableau(
-                string.Format("Before pivot on cut: row {0}, col {1}", cutRowIdx + 1, pivotCol + 1),
-                objectiveRow, constraintRows);
-
-            double piv = constraintRows[cutRowIdx][pivotCol];
-            if (Math.Abs(piv) <= EPS)
+            double piv = crows[rowCutIndex][pcol];
+            if (Math.Abs(piv) <= IntegerRounder)
             {
                 Console.WriteLine("Pivot too small/zero.");
                 return;
             }
-
-            // normalize cut row
             for (int j = 0; j < n; j++)
-                constraintRows[cutRowIdx][j] /= piv;
-
-            // eliminate pivot column from other constraints
-            for (int i = 0; i < constraintRows.Count; i++)
             {
-                if (i == cutRowIdx) continue;
-                double f = constraintRows[i][pivotCol];
-                if (Math.Abs(f) > EPS)
+                crows[rowCutIndex][j] /= piv;
+            }
+                
+            for (int i = 0; i < crows.Count; i++)
+            {
+                if (i == rowCutIndex) continue;
+                double f = crows[i][pcol];
+                if (Math.Abs(f) > IntegerRounder)
                 {
                     for (int j = 0; j < n; j++)
-                        constraintRows[i][j] -= f * constraintRows[cutRowIdx][j];
+                        crows[i][j] -= f * crows[rowCutIndex][j];
                 }
             }
-
-            // eliminate pivot column from objective
             {
-                double f = objectiveRow[pivotCol];
-                if (Math.Abs(f) > EPS)
+                double f = orow[pcol];
+                if (Math.Abs(f) > IntegerRounder)
                 {
                     for (int j = 0; j < n; j++)
-                        objectiveRow[j] -= f * constraintRows[cutRowIdx][j];
+                        orow[j] -= f * crows[rowCutIndex][j];
                 }
             }
+            PrintTableau(string.Format("After pivot on cut: row {0}, col {1}", rowCutIndex + 1, pcol + 1),orow, crows);
 
-            PrintTableau(
-                string.Format("After pivot on cut: row {0}, col {1}", cutRowIdx + 1, pivotCol + 1),
-                objectiveRow, constraintRows);
-
-            // 8) cleanup: Dual then Primal if needed
-            bool needDual = AnyNegativeRhs(constraintRows);
-            bool needPrimal = !IsObjectiveOptimal(objectiveRow);
+            bool needDual = AnyNegativeRhs(crows);
+            bool needPrimal = !IsObjectiveOptimal(orow);
 
             if (needDual)
             {
-                Console.WriteLine("Negative RHS detected → running Dual Simplex...");
+                Console.WriteLine("Negative RHS running Dual Simplex...");
                 var dual = new DualSimplexSolver();
-                bool ok = dual.Solve(objectiveRow, constraintRows, printSteps: true);
-                if (!ok) { Console.WriteLine("Dual Simplex failed (infeasible or max iters)."); return; }
-                PrintTableau("After Dual Simplex:", objectiveRow, constraintRows);
-                needPrimal = !IsObjectiveOptimal(objectiveRow);
+                bool ok = dual.Solve(orow, crows, printSteps: true);
+                if (!ok) { Console.WriteLine("Dual Simplex failed."); return; }
+                PrintTableau("After Dual Simplex:", orow, crows);
+                needPrimal = !IsObjectiveOptimal(orow);
             }
 
             if (needPrimal)
             {
-                Console.WriteLine("Negative reduced cost detected → running Primal Simplex...");
-                var primal = new PrimalSimplexSolver2(objectiveRow, constraintRows);
+                Console.WriteLine("Negative is the Objective row Primal Simplex...");
+                var primal = new PrimalSimplexSolver2(orow, crows);
                 primal.Solve(printSteps: true);
 
                 // copy back updated tableau
-                var rowsTuple = primal.GetRows(false); // returns (double[] ObjectiveRow, List<double[]> ConstraintRows)
-                double[] objRow = rowsTuple.ObjectiveRow;
-                List<double[]> constrRows = rowsTuple.ConstraintRows;
+                var rowsTuple = primal.GetRows(false); 
+                double[] objRow = rowsTuple.orow;
+                List<double[]> constrRows = rowsTuple.crows;
 
-                Array.Copy(objRow, objectiveRow, objectiveRow.Length);
-                for (int i = 0; i < constraintRows.Count; i++)
-                    Array.Copy(constrRows[i], constraintRows[i], constraintRows[i].Length);
+                Array.Copy(objRow, orow, orow.Length);
+                for (int i = 0; i < crows.Count; i++)
+                    Array.Copy(constrRows[i], crows[i], crows[i].Length);
 
-                PrintTableau("After Primal Simplex:", objectiveRow, constraintRows);
+                PrintTableau("After Primal Simplex:", orow, crows);
             }
-
-            // 9) If now optimal & feasible but RHS still fractional, add another cut
-            if (IsObjectiveOptimal(objectiveRow) && !AnyNegativeRhs(constraintRows))
+            if (IsObjectiveOptimal(orow) && !AnyNegativeRhs(crows))
             {
-                if (AnyFractionalRhs(constraintRows))
+                if (AnyFractionalRhs(crows))
                 {
-                    Console.WriteLine("Objective optimal but RHS has fractional values → adding another Gomory cut...");
-                    CuttingPlaneSolution(objectiveRow, constraintRows); // recursive step
+                    Console.WriteLine("Objective optimal but RHS has fractional values proceeding to add additional cut...");
+                    CuttingPlaneSolution(orow, crows); 
                     return;
                 }
 
@@ -225,7 +192,7 @@ namespace LPR_381_Group_V22.IntegerProgramming
                 return;
             }
 
-            Console.WriteLine("Cutting-plane step finished (further steps may be required).");
+            Console.WriteLine("Cutting-plane step finished");
         }
     }
 }
