@@ -33,8 +33,14 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="MathNet.Numerics, Version=5.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MathNet.Numerics.5.0.0\lib\net461\MathNet.Numerics.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.ValueTuple, Version=4.0.2.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.4.0\lib\net47\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -43,6 +49,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IntegerProgramming\BranchAndBoundAdapter.cs" />
     <Compile Include="IntegerProgramming\BranchBoundSimplexSolver.cs" />
     <Compile Include="IntegerProgramming\CuttingPlaneSolver.cs" />
     <Compile Include="IntegerProgramming\KnapsackBranchBoundSolver.cs" />
@@ -56,9 +63,11 @@
     <Compile Include="Simplex\PrimalSimplexSolver2.cs" />
     <Compile Include="Simplex\RevisedPrimalSimplexSolver.cs" />
     <Compile Include="Utilities\CanonicalFormConverter.cs" />
+    <Compile Include="Utilities\TableIterationFormater.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="TextFile\textfile.txt" />

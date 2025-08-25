@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.IO;
 using static LPR_381_Group_V22.IO.InputFileParser;
 using static LPR_381_Group_V22.Utilities.CanonicalFormConverter;
@@ -60,5 +58,35 @@ namespace LPR_381_Group_V22.IO
                 }
             }
         }
+
+        public static void WriteSnapshotsOnly(string outputPath, string solverUsed, List<string> iterationSnapshots, double finalZ, List<double> solutionVector,bool append = false)
+        {
+            string mainPath = AppDomain.CurrentDomain.BaseDirectory;
+            string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
+            string fullPath = Path.Combine(projectRoot, outputPath);
+
+            using (var writer = new StreamWriter(fullPath, append: append))
+            {
+                writer.WriteLine($"=== Iteration Snapshots ({solverUsed}) ===");
+                foreach (var snapshot in iterationSnapshots ?? new List<string>())
+                {
+                    writer.WriteLine(snapshot);
+                    writer.WriteLine("-------------------------------------------------------------------------------------");
+                }
+
+                writer.WriteLine($"\nFinal Z value: {finalZ:0.000}");
+                writer.WriteLine("Variable Solutions:");
+                if (solutionVector != null && solutionVector.Count > 0)
+                {
+                    for (int i = 0; i < solutionVector.Count; i++)
+                        writer.WriteLine($"x{i + 1}: {solutionVector[i]:0.000}");
+                }
+                else
+                {
+                    writer.WriteLine("(no variables)");
+                }
+            }
+        }
+
     }
 }

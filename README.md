@@ -47,7 +47,7 @@ This is a Linear and Integer Programming Solver developed for the Linear Program
 - Output File Generation (Canonical Form & Iterations)
 
 ## 👥 Contributors
-- `Storm Tarran 600995: Input/Output Handling, Canonical Form, Primal Simplex & Cutting Plane Algorithms`
-- `Demica Smit 577875: Revised Simplex Method, Sensitivity Analysis, Duality`
-- `Adrian Christopher Conradie 600548: Branch & Bound Simplex Solver`
+- `Storm Tarran 600995: Input/Output Handling, Canonical Form, Primal Simplex & Branch and Bound Simplex Solver`
+- `Demica Smit 577875: Revised Simplex Method, Sensitivity Analysis`
+- `Adrian Christopher Conradie 600548: Cutting Plane Solver & Dual Simplex Solver`
 - `Leonard Bezuidenhout	578375: Knapsack Solver, Testing, Documentation`

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using LPR_381_Group_V22.Utilities;
 
 public class DualSimplexSolver
 {
@@ -74,19 +75,35 @@ public class DualSimplexSolver
                 return false;
             }
 
+            //if (printSteps)
+            //{
+            //    Console.WriteLine($"\nIteration {++iter}: pivot @ row {pivotRow}, col {pivotCol}");
+            //    PrintTableau(objectiveRow, constraintRows);
+            //}
+
+            //Pivot(objectiveRow, constraintRows, pivotRow, pivotCol);
+
+            //if (printSteps)
+            //{
+            //    Console.WriteLine("After pivot:");
+            //    PrintTableau(objectiveRow, constraintRows);
+            //}
             if (printSteps)
             {
-                Console.WriteLine($"\nIter {++iter}: pivot @ row {pivotRow}, col {pivotCol}");
-                PrintTableau(objectiveRow, constraintRows);
+                int n = NumVars(objectiveRow, constraintRows);
+                Console.WriteLine($"\nIteration {++iter}: pivot @ constraint {pivotRow + 1}, column {ColLabel(pivotCol, n)}");
+                PrintTableau(objectiveRow, constraintRows, n);
             }
 
             Pivot(objectiveRow, constraintRows, pivotRow, pivotCol);
 
             if (printSteps)
             {
+                int n = NumVars(objectiveRow, constraintRows);
                 Console.WriteLine("After pivot:");
-                PrintTableau(objectiveRow, constraintRows);
+                PrintTableau(objectiveRow, constraintRows, NumVars(objectiveRow, constraintRows));
             }
+
 
             if (iter >= maxIters)
             {
@@ -95,6 +112,7 @@ public class DualSimplexSolver
             }
         }
     }
+
 
     // ---------- Accessors like the primal solver ----------
 
@@ -166,12 +184,28 @@ public class DualSimplexSolver
         return rows.Any(r => r[rhs] < -EPS);
     }
 
-    public static void PrintTableau(double[] objectiveRow, List<double[]> constraintRows)
+    //public static void PrintTableau(double[] objectiveRow, List<double[]> constraintRows)
+    //{
+    //    Console.WriteLine("Z: " + string.Join("\t", objectiveRow.Select(v => v.ToString("0.####"))));
+    //    for (int i = 0; i < constraintRows.Count; i++)
+    //        Console.WriteLine($"x{i + 1}: " + string.Join("\t", constraintRows[i].Select(v => v.ToString("0.####"))));
+    //}
+    public static void PrintTableau(double[] objectiveRow, List<double[]> constraintRows, int numVars, string title = null)
     {
-        Console.WriteLine("OBJ: " + string.Join("\t", objectiveRow.Select(v => v.ToString("0.####"))));
-        for (int i = 0; i < constraintRows.Count; i++)
-            Console.WriteLine($"r{i + 1}: " + string.Join("\t", constraintRows[i].Select(v => v.ToString("0.####"))));
+        int cols = objectiveRow.Length;
+        int rows = (constraintRows?.Count ?? 0) + 1;
+        var table = new double[rows, cols];
+
+        // Z row
+        for (int j = 0; j < cols; j++) table[0, j] = objectiveRow[j];
+        // constraints
+        for (int i = 0; i < rows - 1; i++)
+            for (int j = 0; j < cols; j++)
+                table[i + 1, j] = constraintRows[i][j];
+
+        Console.WriteLine(TableIterationFormater.Format(table, numVars, title ?? "Dual Simplex Tableau"));
     }
+
 
     private static double[] CloneRow(double[] row)
     {
@@ -191,4 +225,17 @@ public class DualSimplexSolver
         }
         return list;
     }
+    private static int NumVars(double[] objectiveRow, List<double[]> constraintRows)
+    {
+        // RHS is the last column; assume one slack per constraint.
+        int cols = objectiveRow.Length;              // includes RHS
+        int m = constraintRows?.Count ?? 0;          // #constraints (= #slacks)
+        return cols - 1 - m;                         // (#non‑RHS) - slacks = decision vars
+    }
+
+    private static string ColLabel(int col, int numVars)
+    {
+        return (col < numVars) ? $"x{col + 1}" : $"t{col - numVars + 1}";
+    }
+
 }
