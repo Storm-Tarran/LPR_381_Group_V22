@@ -5,6 +5,14 @@ using LPR_381_Group_V22.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using LPR_381_Group_V22.Simplex;
+using LPR_381_Group_V22.IntegerProgramming;
+using LPR_381_Group_V22.Utilities;
+using System.Linq.Expressions;
+using System.Diagnostics;
 
 namespace LPR_381_Group_V22
 {
@@ -75,8 +83,9 @@ namespace LPR_381_Group_V22
                 Console.WriteLine("3. Solve with Branch and Bound Simplex Algorithm");
                 Console.WriteLine("4. Solve with Cutting Plane Algorithm");
                 Console.WriteLine("5. Solve with Branch and Bound Knapsack Algorithm");
-                Console.WriteLine("6. Exit");
-                Console.Write("Please select an option (1-6): ");
+                Console.WriteLine("6. Sensitivity analysis");
+                Console.WriteLine("7. Exit");
+                Console.Write("Please select an option (1-7): ");
                 string choice = Console.ReadLine();
 
                 switch (choice)
@@ -126,7 +135,6 @@ namespace LPR_381_Group_V22
                             primalSolver.IterationSnapshots,
                             primalSolver.FinalZ,
                             primalSolver.SolutionVector);
-
 
                         Console.WriteLine("\nAll results have been saved to 'output_results.txt'.");
                         Console.ReadKey();
@@ -212,8 +220,85 @@ namespace LPR_381_Group_V22
                     case "5":
                         Console.WriteLine("Solving with Branch and Bound Knapsack Algorithm...");
                         break;
-
                     case "6":
+                        Console.Clear();
+                        Console.WriteLine("Sensitivity Analysis");
+                        Console.WriteLine("1. Display the range of a selected Non-Basic Variable.");
+                        Console.WriteLine("2. Change a non-basic variable");
+                        Console.WriteLine("3. Display the range of a selected Basic Variable.");
+                        Console.WriteLine("4. Change a basic variable");
+                        Console.WriteLine("5. Display the range of a selected constraint right-hand-side value.");
+                        Console.WriteLine("6. Change a selected constraint right-hand-side value. ");
+                        Console.WriteLine("7. Display the range of a selected variable in a Non-Basic Variable column. ");
+                        Console.WriteLine("8. Change a selected variable in a Non-Basic Variable column");
+                        Console.WriteLine("9. Add a new activity to an optimal solution.");
+                        Console.WriteLine("10. Add a new constraint to an optimal solution. ");
+                        Console.WriteLine("11. Display the shadow prices. ");
+                        Console.WriteLine("12. Duality");
+                        Console.Write("Please select an option (1-12): ");
+                        string choice2 = Console.ReadLine();
+                        switch (choice2)
+                        {
+
+
+                            case "1":
+                                Console.Clear();
+                                break;
+
+                            case "2":
+                                Console.Clear();
+                                break;
+
+                            case "3":
+                                Console.Clear();
+                                break;
+
+                            case "4":
+                                Console.Clear();
+                                break;
+
+                            case "5":
+                                Console.Clear();
+                                break;
+
+                            case "6":
+                                Console.Clear();
+                                break;
+
+                            case "7":
+                                Console.Clear();
+                                break;
+
+                            case "8":
+                                Console.Clear();
+                                break;
+
+                            case "9":
+                                Console.Clear();
+                                break;
+
+                            case "10":
+                                Console.Clear();
+                                break;
+
+                            case "11":
+                                Console.Clear();
+                                break;
+
+                            case "12":
+                                Console.Clear();
+                                break;
+
+                           
+                            default:
+                                Console.WriteLine("Invalid choice. Please select a valid option (1-6).");
+                                break;
+
+
+                            }
+                            break;
+
+                    case "7":
                         exit = true;
                         Console.WriteLine("Exiting the application. Goodbye!");
                         break;
@@ -229,6 +314,5 @@ namespace LPR_381_Group_V22
                 }
             }
         }
-
     }
 }
