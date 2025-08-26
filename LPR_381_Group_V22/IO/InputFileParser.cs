@@ -18,7 +18,8 @@ namespace LPR_381_Group_V22.IO
         //Reading the input file and parsing the data
         public void ReadInputFile(string filePath)
         {
-            if (!File.Exists(filePath)){
+            if (!File.Exists(filePath))
+            {
                 Console.WriteLine("Sorry, we can't find your file, please check it's in the right folser");
                 return;
             }
@@ -33,21 +34,21 @@ namespace LPR_381_Group_V22.IO
             }
 
             string[] objectiveLine = linesInFile[0].Trim().Split(' ');
-            ProblemType = objectiveLine[0].ToLower(); 
+            ProblemType = objectiveLine[0].ToLower();
 
-            for(int i =1; i < objectiveLine.Length; i++)
+            for (int i = 1; i < objectiveLine.Length; i++)
             {
                 double objectiveCoefficient = double.Parse(objectiveLine[i], System.Globalization.CultureInfo.InvariantCulture);
                 ObjectiveCoefficients.Add(objectiveCoefficient);
             }
 
-            for(int i = 1; i < linesInFile.Length - 1; i++)
+            for (int i = 1; i < linesInFile.Length - 1; i++)
             {
                 string[] constraintParts = linesInFile[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 List<double> coefficientConstraint = new List<double>();
 
                 // Parse coefficients for the constraint
-                for(int j = 0; j < ObjectiveCoefficients.Count; j++)
+                for (int j = 0; j < ObjectiveCoefficients.Count; j++)
                 {
                     double coefficients = double.Parse(constraintParts[j], System.Globalization.CultureInfo.InvariantCulture);
                     coefficientConstraint.Add(coefficients);
@@ -66,7 +67,7 @@ namespace LPR_381_Group_V22.IO
             Console.WriteLine("Your file was read and is in the correct format!");
         }
 
-        public class Constraint 
+        public class Constraint
         {
             public List<double> Coefficients { get; }
             public string Relation { get; }

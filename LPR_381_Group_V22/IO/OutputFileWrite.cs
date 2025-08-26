@@ -1,92 +1,138 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Text;
+using LPR_381_Group_V22.Simplex;
+using LPR_381_Group_V22.Utilities;
 using static LPR_381_Group_V22.IO.InputFileParser;
-using static LPR_381_Group_V22.Utilities.CanonicalFormConverter;
 
 namespace LPR_381_Group_V22.IO
 {
     public static class OutputFileWrite
     {
-        public static void WriteFullResults(string outputPath, string problemType, string solverUsed, List<double> objectiveCoefficients,
-            List<Constraint> constraints, List<string> signRestrictions, List<string> iterationSnapshots, double finalZ, List<double> solutionVector)
+        
+        public static void WriteFullResults(
+            string filePath,
+            string solverUsed,
+            string problemType,
+            List<double> objectiveCoefficients,
+            List<Constraint> constraints,
+            List<string> signRestrictions,
+            List<string> iterationSnapshots,
+            double finalZ,
+            List<double> solutionVector,
+            bool append = false)
         {
-            string mainPath = AppDomain.CurrentDomain.BaseDirectory;
-            string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
-            string fullPath = Path.Combine(projectRoot, outputPath);
+            EnsureDirectory(filePath);
 
-            using (StreamWriter writer = new StreamWriter(fullPath))
+            var sb = new StringBuilder();
+
+            // Header
+            sb.AppendLine("============================================================");
+            sb.AppendLine($"Solver: {solverUsed}");
+            sb.AppendLine($"Problem type: {problemType}");
+            sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine("============================================================");
+
+            // Canonical form (as text)
+            try
             {
-                writer.WriteLine("=== Solver Results ===");
-                writer.WriteAsync($"Solver used: {problemType}");
-                writer.WriteLine($"\nProblem Type: {solverUsed}");
-                var objectiveFunction = new StringBuilder();
-                objectiveFunction.Append("Objective Function: Z = ");
-                for (int i = 0; i < objectiveCoefficients.Count; i++)
-                {
-                    double oCoeff = objectiveCoefficients[i];
-                    objectiveFunction.Append($"{(oCoeff >= 0 ? "+ " : "- ")}{oCoeff}x{i + 1} ");
-                }
-                writer.WriteLine(objectiveFunction.ToString().Trim());
-                writer.WriteLine("Constraints:");
-                foreach(var constraint in constraints)
-                {
-                    for (int i = 0; i < constraint.Coefficients.Count; i++)
-                    {
-                        writer.Write($"{(constraint.Coefficients[i] >= 0 ? "+" : "")}{constraint.Coefficients[i]}x{i + 1} ");
-                    }
-                    writer.WriteLine($"{constraint.Relation} {constraint.RHS:0.000}");
-                }
-                writer.WriteLine("Sign Restrictions:");
-                writer.WriteLine(string.Join(" ", signRestrictions));
+                sb.Append(CanonicalFormConverter.CanonicalFormForFile(
+                    problemType,
+                    objectiveCoefficients,
+                    constraints,
+                    signRestrictions));
+            }
+            catch
+            {
+                // If for any reason canonical form fails, don't block output
+                sb.AppendLine("[Canonical form unavailable]");
+            }
 
-                writer.WriteLine(CanonicalFormForFile(problemType, objectiveCoefficients, constraints, signRestrictions));
-
-                writer.WriteLine("\n=== Iteration Snapshots ===");
-                foreach (var snapshot in iterationSnapshots)
+            // Iterations
+            if (iterationSnapshots != null && iterationSnapshots.Count > 0)
+            {
+                sb.AppendLine("=== Iteration Snapshots ===");
+                for (int i = 0; i < iterationSnapshots.Count; i++)
                 {
-                    writer.WriteLine(snapshot);
-                    writer.WriteLine("-------------------------------------------------------------------------------------");
+                    sb.AppendLine($"--- Iteration {i + 1} ---");
+                    sb.AppendLine(iterationSnapshots[i]);
                 }
+                sb.AppendLine();
+            }
 
-                writer.WriteLine($"\nFinal Z value: {finalZ:0.000}");
-                writer.WriteLine("Variable Solutions:");
+            // Final results
+            sb.AppendLine("=== Final Results ===");
+            sb.AppendLine($"Z* = {NumFormat.N3(finalZ)}");
+
+            if (solutionVector != null && solutionVector.Count > 0)
+            {
                 for (int i = 0; i < solutionVector.Count; i++)
-                {
-                    writer.WriteLine($"x{i + 1}: {solutionVector[i]:0.000}");
-                }
+                    sb.AppendLine($"x{i + 1} = {NumFormat.N3(solutionVector[i])}");
             }
+
+            // Write
+            WriteToFile(filePath, sb.ToString(), append);
         }
 
-        public static void WriteSnapshotsOnly(string outputPath, string solverUsed, List<string> iterationSnapshots, double finalZ, List<double> solutionVector,bool append = false)
+        /// <summary>
+        /// Minimal writer when you just have a block of text (snapshots), Z, and x.
+        /// </summary>
+        public static void WriteSnapshotsOnly(
+            string filePath,
+            string solverUsed,
+            List<string> snapshots,
+            double finalZ,
+            List<double> solutionVector,
+            bool append = true)
         {
-            string mainPath = AppDomain.CurrentDomain.BaseDirectory;
-            string projectRoot = Directory.GetParent(mainPath).Parent.Parent.FullName;
-            string fullPath = Path.Combine(projectRoot, outputPath);
+            EnsureDirectory(filePath);
 
-            using (var writer = new StreamWriter(fullPath, append: append))
+            var sb = new StringBuilder();
+            sb.AppendLine("============================================================");
+            sb.AppendLine($"Solver: {solverUsed}");
+            sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine("============================================================");
+
+            if (snapshots != null && snapshots.Count > 0)
             {
-                writer.WriteLine($"=== Iteration Snapshots ({solverUsed}) ===");
-                foreach (var snapshot in iterationSnapshots ?? new List<string>())
+                sb.AppendLine("=== Solver Log ===");
+                foreach (var s in snapshots)
                 {
-                    writer.WriteLine(snapshot);
-                    writer.WriteLine("-------------------------------------------------------------------------------------");
-                }
-
-                writer.WriteLine($"\nFinal Z value: {finalZ:0.000}");
-                writer.WriteLine("Variable Solutions:");
-                if (solutionVector != null && solutionVector.Count > 0)
-                {
-                    for (int i = 0; i < solutionVector.Count; i++)
-                        writer.WriteLine($"x{i + 1}: {solutionVector[i]:0.000}");
-                }
-                else
-                {
-                    writer.WriteLine("(no variables)");
+                    sb.AppendLine(s);
+                    if (!s.EndsWith("\n")) sb.AppendLine();
                 }
             }
+
+            sb.AppendLine("=== Final Results ===");
+            sb.AppendLine($"Z* = {NumFormat.N3(finalZ)}");
+
+            if (solutionVector != null && solutionVector.Count > 0)
+            {
+                for (int i = 0; i < solutionVector.Count; i++)
+                    sb.AppendLine($"x{i + 1} = {NumFormat.N3(solutionVector[i])}");
+            }
+
+            WriteToFile(filePath, sb.ToString(), append);
         }
 
+        // ----------------- helpers -----------------
+
+        private static void EnsureDirectory(string filePath)
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+        }
+
+        private static void WriteToFile(string filePath, string content, bool append)
+        {
+            if (append && File.Exists(filePath))
+                File.AppendAllText(filePath, content, Encoding.UTF8);
+            else
+                File.WriteAllText(filePath, content, Encoding.UTF8);
+        }
     }
 }

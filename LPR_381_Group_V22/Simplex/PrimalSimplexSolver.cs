@@ -11,7 +11,7 @@ namespace LPR_381_Group_V22.Simplex
     {
         private double[,] tableau;
         private int numVariables, numConstraints;
-        private List<string> basicVariables;
+        private List<int> basicVariables;
         private int iteration = 0;
 
         public List<string> IterationSnapshots = new List<string>();
@@ -20,7 +20,7 @@ namespace LPR_381_Group_V22.Simplex
 
         // Adding to allow external use of the final table
         public double[,] FinalTableau { get; private set; }
-        public IReadOnlyList<string> FinalLabels => basicVariables.AsReadOnly();
+        public IReadOnlyList<string> FinalLabels => basicVariables.Select(idx => ColLabel(idx)).ToList().AsReadOnly();
         public string FinalTable => (FinalTableau == null) ? "" : TableIterationFormater.Format(FinalTableau, numVariables, "Final Table", FinalLabels);
 
 
@@ -51,7 +51,7 @@ namespace LPR_381_Group_V22.Simplex
             }
 
             numConstraints = processedConstraints.Count;
-            basicVariables = new List<string>();
+            basicVariables = new List<int>();
 
             int tableauCols = numVariables + numConstraints + 1; // vars + slacks + solution col
             int tableauRows = numConstraints + 1; // constraints + Z-row
@@ -71,9 +71,12 @@ namespace LPR_381_Group_V22.Simplex
                         tableau[i + 1, j] = constraint.Coefficients[j];
                 }
 
-                // Slack Variable (identity matrix)
-                tableau[i + 1, numVariables + i] = 1;
-                basicVariables.Add(ColLabel(numVariables + i));
+                // Slack column e_i
+                int slackCol = numVariables + i;
+                tableau[i + 1, slackCol] = 1.0;
+
+                basicVariables.Add(slackCol);
+
 
                 // RHS
                 tableau[i + 1, tableauCols - 1] = constraint.RHS;
@@ -136,7 +139,7 @@ namespace LPR_381_Group_V22.Simplex
                 Console.WriteLine(TableIterationFormater.Format(tableau, numVariables, "Before pivot"));
 
                 Pivot(leavingRow, enteringCol);
-                basicVariables[leavingRow - 1] = ColLabel(enteringCol);
+                basicVariables[leavingRow - 1] = enteringCol;
 
                 // PRINT: after pivot
                 Console.WriteLine($"After pivot (constraint {leavingRow}, column {ColLabel(enteringCol)}):");
@@ -261,6 +264,17 @@ namespace LPR_381_Group_V22.Simplex
                     sb.AppendLine($"x{i + 1} = {SolutionVector[i]:F6}");
             }
             return sb.ToString();
+        }
+
+        public double[,] GetFinalTableau()
+        {
+            // Build a final tableau from the stored tableau[,] 
+            return (double[,])tableau.Clone();
+        }
+
+        public List<int> BasicVariables
+        {
+            get { return new List<int>(basicVariables); }
         }
     }
 }
