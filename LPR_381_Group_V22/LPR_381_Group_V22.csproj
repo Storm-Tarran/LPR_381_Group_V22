@@ -55,6 +55,7 @@
     <Compile Include="IntegerProgramming\KnapsackBranchBoundSolver.cs" />
     <Compile Include="IO\InputFileParser.cs" />
     <Compile Include="IO\OutputFileWrite.cs" />
+    <Compile Include="NonLinear\BonusQuestion.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SensitivityAnalysis\SensitivityAnalyzer.cs" />

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LPR_381_Group_V22.SensitivityAnalysis;
+using LPR_381_Group_V22.NonLinear;
 
 namespace LPR_381_Group_V22
 {
@@ -80,7 +81,8 @@ namespace LPR_381_Group_V22
                 Console.WriteLine("3. Solve with Branch and Bound Simplex Algorithm");
                 Console.WriteLine("4. Solve with Cutting Plane Algorithm");
                 Console.WriteLine("5. Solve with Branch and Bound Knapsack Algorithm");
-                Console.WriteLine("6. Exit");
+                Console.WriteLine("6. Solve a Non-Linear Problem");
+                Console.WriteLine("7. Exit");
                 Console.Write("Please select an option (1-6): ");
                 string choice = Console.ReadLine();
 
@@ -439,6 +441,7 @@ namespace LPR_381_Group_V22
                         break;
 
                     case "4":
+                        Console.Clear();
                         Console.WriteLine("Solving with Cutting Plane Algorithm...");
                         CanonicalFormConverter.DisplayCanonicalForm(
                             inputFileParser.ProblemType,
@@ -453,8 +456,15 @@ namespace LPR_381_Group_V22
                     case "5":
                         Console.WriteLine("Solving with Branch and Bound Knapsack Algorithm...");
                         break;
-
+                       
                     case "6":
+                        Console.Clear();
+                        Console.WriteLine("Solving a Non-Linear Problem...");
+                        var bonusQuestion = new BonusQuestion();
+                        bonusQuestion.Solve();
+                        break;
+
+                    case "7":
                         exit = true;
                         Console.WriteLine("Exiting the application. Goodbye!");
                         break;
