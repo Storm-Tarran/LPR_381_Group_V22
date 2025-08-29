@@ -190,7 +190,7 @@ namespace LPR_381_Group_V22
                                 case "2":
 
                                     Console.WriteLine("=== Change Non-Basic Variable ===");
-                                    sensitivityAnalyzer.ChangeNonBasic();
+                                    sensitivityAnalyzer.ChangeNonBasicReducedCost();
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
 
@@ -248,7 +248,17 @@ namespace LPR_381_Group_V22
                                 case "9":
 
                                     Console.WriteLine("=== Add New Activity ===");
-                                    sensitivityAnalyzer.AddNewActivity();
+                                    sensitivityAnalyzer.AddNewActivity(); // this already re-optimizes if needed
+
+                                    // pull the recalculated results
+                                    var T = sensitivityAnalyzer.CurrentTableau;
+                                    var Z = sensitivityAnalyzer.CurrentZ;
+                                    var x = sensitivityAnalyzer.CurrentSolutionVector;
+
+                                    Console.WriteLine($"Updated Z* = {Z:0.###}");
+                                    for (int i = 0; i < Math.Min(x.Count, inputFileParser.ObjectiveCoefficients.Count); i++)
+                                        Console.WriteLine($"x{i + 1} = {x[i]:0.###}");
+
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
                                     break;

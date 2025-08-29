@@ -9,6 +9,8 @@ namespace LPR_381_Group_V22.Utilities
 {
     public static class CanonicalFormConverter
     {
+
+
         // FOR CONSOLE OUTPUT...im lazy to go change this whole thing, so im just adding
         public static void DisplayCanonicalForm(string problemType, List<double> objectiveCoefficients,
             List<Constraint> constraints, List<string> signRestrictions)

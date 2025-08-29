@@ -11,26 +11,26 @@ namespace LPR_381_Group_V22.Simplex
     {
         private const double EPS = 1e-9;
 
-        // Original objective (for final Z sign) and working objective (always maximize)
+        
         private readonly double[] cOrig;
         private double[] c;
 
         // Ax = b data (standard form expects <= turned into slacks; x >= 0)
-        private readonly double[,] A; // m x n
-        private readonly double[] b;   // m
+        private readonly double[,] A; 
+        private readonly double[] b;   
 
-        private readonly int numVariables;   // n
-        private readonly int numConstraints; // m
+        private readonly int numVariables;   
+        private readonly int numConstraints; 
         private readonly bool isMinimization;
 
         // Basis bookkeeping 
-        private readonly List<int> basicVariables;    
-        private readonly List<int> nonBasicVariables; 
+        private readonly List<int> basicVariables;
+        private readonly List<int> nonBasicVariables;
 
-        private double[,] B;        
-        private double[,] BInverse; 
-        private double[] cB;        
-        private double[] xB;        
+        private double[,] B;
+        private double[,] BInverse;
+        private double[] cB;
+        private double[] xB;
 
         private double finalZ;
         public List<string> IterationSnapshots { get; private set; } = new List<string>();
@@ -54,6 +54,8 @@ namespace LPR_381_Group_V22.Simplex
             b = new double[numConstraints];
             for (int i = 0; i < numConstraints; i++)
             {
+                if (constraints[i].Coefficients.Count != numVariables)
+                    throw new ArgumentException($"Constraint {i + 1} has incorrect number of coefficients.");
                 for (int j = 0; j < numVariables; j++) A[i, j] = constraints[i].Coefficients[j];
                 b[i] = constraints[i].RHS;
             }
@@ -83,111 +85,119 @@ namespace LPR_381_Group_V22.Simplex
 
             while (true)
             {
-                // 1) Compute basic solution and dual prices
+                // 1) Compute current basic solution and dual prices (pre-pivot quantities)
                 xB = MultiplyMatrixVector(BInverse, b);
-                if (xB.Any(x => x < -EPS)) throw new Exception("Infeasible basis (negative basic value).");
+                if (xB.Any(x => x < -EPS))
+                    throw new Exception("Infeasible basis (negative basic value).");
 
-                var y = MultiplyVectorMatrix(cB, BInverse); // cB^T B^{-1}
+                var y = MultiplyVectorMatrix(cB, BInverse); // y = c_B^T B^{-1}
 
-                // 2) Reduced costs for all variables (x and slacks)
-                var rcX = new double[numVariables];
+                // 2) Reduced costs (pre-pivot)
+                var rcX_pre = new double[numVariables];
                 for (int j = 0; j < numVariables; j++)
-                    rcX[j] = c[j] - Dot(y, GetColumn(A, j));
+                    rcX_pre[j] = c[j] - Dot(y, GetColumn(A, j));
 
-                var rcS = new double[numConstraints];
+                var rcS_pre = new double[numConstraints];
                 for (int k = 0; k < numConstraints; k++)
-                    rcS[k] = -y[k]; // reduced costs of slack columns
+                    rcS_pre[k] = -y[k]; // slack reduced cost = 0 - y_k
 
-                // 3) Choose entering variable (for working MAX): pick most positive reduced cost
+                // 3) Choose entering variable (MAX): strictly positive reduced cost with Bland tie-break
                 int enteringIdx = -1;
-                double bestPosRC = EPS; // require strictly > EPS to enter
+                double bestPosRC = double.NegativeInfinity;
 
-                foreach (var vIdx in nonBasicVariables.OrderBy(v => v)) // Bland tie-break
+                foreach (var vIdx in nonBasicVariables.OrderBy(v => v)) // Bland: smallest index first on ties
                 {
-                    double rc = (vIdx < numVariables) ? rcX[vIdx] : rcS[vIdx - numVariables];
-                    if (rc > bestPosRC + EPS ||
-                        (Math.Abs(rc - bestPosRC) <= EPS && enteringIdx != -1 && vIdx < enteringIdx))
+                    double rc = (vIdx < numVariables) ? rcX_pre[vIdx] : rcS_pre[vIdx - numVariables];
+                    if (rc > EPS)
                     {
-                        bestPosRC = rc;
-                        enteringIdx = vIdx;
+                        if (enteringIdx == -1 ||
+                            rc > bestPosRC + EPS ||
+                            (Math.Abs(rc - bestPosRC) <= EPS && vIdx < enteringIdx))
+                        {
+                            bestPosRC = rc;
+                            enteringIdx = vIdx;
+                        }
                     }
                 }
 
-                // If no entering variable, optimal for the working (max) problem
+                // 4) Optimal if no entering variable
                 if (enteringIdx == -1)
                 {
-                    ExtractSolution(); // fills SolutionVector and finalZ using original c
-                    // *** Final snapshot of basis & solution (clear, at optimal) ***
+                    ExtractSolution(); // fills SolutionVector + finalZ (original objective)
+                                       // For the "optimal" snapshot: show post quantities = current ones
                     CaptureSnapshot(
-                        title: $"Iteration {iteration} (optimal)",
+                        title: "Optimal",
                         xB: xB,
                         y: y,
-                        rcX: rcX,
-                        rcS: rcS,
+                        rcX_post: rcX_pre,
+                        rcS_post: rcS_pre,
                         enteringIdx: -1,
-                        u: new double[numConstraints],
-                        ratios: Enumerable.Repeat(double.PositiveInfinity, numConstraints).ToArray(),
+                        enteringRC_pre: 0.0,
+                        u_pre: new double[numConstraints],
+                        ratios_pre: Enumerable.Repeat(double.PositiveInfinity, numConstraints).ToArray(),
+                        // ratio labels/leaving label use pre-pivot basis (same as current)
+                        basisForRatios_Pre: new List<int>(basicVariables),
                         leavingRow: -1,
+                        leavingVarIndex_Pre: -1,
                         zWorking: Dot(cB, xB),
                         zOriginal: finalZ
                     );
                     return;
                 }
 
-                // 4) Direction u = B^{-1} a_enter (or B^{-1} e_k for slack enter)
-                double[] u = (enteringIdx < numVariables)
+                // 5) Direction u = B^{-1} a_enter (pre-pivot)
+                double[] u_pre = (enteringIdx < numVariables)
                     ? MultiplyMatrixVector(BInverse, GetColumn(A, enteringIdx))
-                    : GetColumn(BInverse, enteringIdx - numVariables);
+                    : GetColumn(BInverse, enteringIdx - numVariables); // since a_enter = e_k for slack k
 
-                // 5) Ratio test with Bland: pick leaving row
+                // 6) Ratio test (pre-pivot) with Bland tie-break (smallest basic var index on a tie)
                 int leavingRow = -1;
+                int leavingVarIndex_Pre = -1;
                 double bestRatio = double.MaxValue;
-                var ratios = new double[numConstraints];
+                var ratios_pre = new double[numConstraints];
 
                 for (int i = 0; i < numConstraints; i++)
                 {
-                    if (u[i] > EPS)
+                    if (u_pre[i] > EPS)
                     {
-                        ratios[i] = xB[i] / u[i];
-                        if (ratios[i] < bestRatio - EPS ||
-                            (Math.Abs(ratios[i] - bestRatio) <= EPS &&
+                        ratios_pre[i] = xB[i] / u_pre[i];
+                        if (ratios_pre[i] < bestRatio - EPS ||
+                            (Math.Abs(ratios_pre[i] - bestRatio) <= EPS &&
                              (leavingRow == -1 || basicVariables[i] < basicVariables[leavingRow])))
                         {
-                            bestRatio = ratios[i];
+                            bestRatio = ratios_pre[i];
                             leavingRow = i;
                         }
                     }
                     else
                     {
-                        ratios[i] = double.PositiveInfinity;
+                        ratios_pre[i] = double.PositiveInfinity;
                     }
                 }
 
-                if (leavingRow == -1) throw new Exception("Unbounded (no positive component in direction).");
+                if (leavingRow == -1)
+                    throw new Exception("Unbounded problem (no positive component in direction).");
 
-                // PRE-PIVOT snapshot (shows which will enter/leave) ***
-                CaptureSnapshot(
-                    title: $"Iteration {iteration} (pre-pivot)",
-                    xB: xB,
-                    y: y,
-                    rcX: rcX,
-                    rcS: rcS,
-                    enteringIdx: enteringIdx,
-                    u: u,
-                    ratios: ratios,
-                    leavingRow: leavingRow,
-                    zWorking: Dot(cB, xB),
-                    zOriginal: ComputeOriginalZFromCurrentBasis(xB)
-                );
+                leavingVarIndex_Pre = basicVariables[leavingRow];
+                if (leavingVarIndex_Pre == enteringIdx)
+                    throw new Exception("Internal error: entering variable is already basic.");
 
-                // 6) Pivot bookkeeping (basis swap & sets)  // ***
+                // Save the pre-pivot basis for ratio labeling in the snapshot
+                var basisForRatios_Pre = new List<int>(basicVariables);
+
+                // Pre-pivot entering reduced cost (for the log line)
+                double enteringRC_pre = (enteringIdx < numVariables)
+                    ? rcX_pre[enteringIdx]
+                    : rcS_pre[enteringIdx - numVariables];
+
+                // 7) Pivot bookkeeping (swap in the basis & nonbasic sets)
                 int leavingVar = basicVariables[leavingRow];
                 basicVariables[leavingRow] = enteringIdx;
                 nonBasicVariables.Remove(enteringIdx);
                 if (!nonBasicVariables.Contains(leavingVar))
                     nonBasicVariables.Add(leavingVar);
 
-                // 7) Update B column and cB row
+                // 8) Update B column and cB row (post-pivot B and cB)
                 if (enteringIdx < numVariables)
                 {
                     var a_col = GetColumn(A, enteringIdx);
@@ -201,29 +211,37 @@ namespace LPR_381_Group_V22.Simplex
                     cB[leavingRow] = 0.0;
                 }
 
-                // 8) Update B^{-1} via Eta (using u)
-                UpdateBInverse(leavingRow, u);
+                // 9) Update B^{-1} using the eta-like elementary inverse (post-pivot inverse)
+                UpdateBInverse(leavingRow, u_pre);
 
-                // *** POST-PIVOT recompute & snapshot so labels show the new basis ***
+                // 10) Recompute post-pivot quantities for the printed tableau / Z~ row
                 xB = MultiplyMatrixVector(BInverse, b);
-                var yPost = MultiplyVectorMatrix(cB, BInverse);
-                var rcXPost = new double[numVariables];
-                for (int j = 0; j < numVariables; j++)
-                    rcXPost[j] = c[j] - Dot(yPost, GetColumn(A, j));
-                var rcSPost = new double[numConstraints];
-                for (int k = 0; k < numConstraints; k++)
-                    rcSPost[k] = -yPost[k];
+                var y_post = MultiplyVectorMatrix(cB, BInverse);
 
+                var rcX_post = new double[numVariables];
+                for (int j = 0; j < numVariables; j++)
+                    rcX_post[j] = c[j] - Dot(y_post, GetColumn(A, j));
+
+                var rcS_post = new double[numConstraints];
+                for (int k = 0; k < numConstraints; k++)
+                    rcS_post[k] = -y_post[k];
+
+                // 11) Snapshot AFTER the pivot:
+                // - Reduced costs, duals, tableau are post-pivot
+                // - The direction/ratios/leaving name are shown from pre-pivot data (correct labeling)
                 CaptureSnapshot(
-                    title: $"Iteration {iteration} (post-pivot)",
+                    title: $"Iteration {iteration + 1}",
                     xB: xB,
-                    y: yPost,
-                    rcX: rcXPost,
-                    rcS: rcSPost,
+                    y: y_post,
+                    rcX_post: rcX_post,
+                    rcS_post: rcS_post,
                     enteringIdx: enteringIdx,
-                    u: u,
-                    ratios: ratios,
+                    enteringRC_pre: enteringRC_pre,
+                    u_pre: u_pre,
+                    ratios_pre: ratios_pre,
+                    basisForRatios_Pre: basisForRatios_Pre,
                     leavingRow: leavingRow,
+                    leavingVarIndex_Pre: leavingVarIndex_Pre,
                     zWorking: Dot(cB, xB),
                     zOriginal: ComputeOriginalZFromCurrentBasis(xB)
                 );
@@ -234,7 +252,6 @@ namespace LPR_381_Group_V22.Simplex
 
         private double ComputeOriginalZFromCurrentBasis(double[] currentXB)
         {
-            // Build full x (nonbasics = 0)
             var x = new double[numVariables];
             for (int i = 0; i < numConstraints; i++)
             {
@@ -274,19 +291,21 @@ namespace LPR_381_Group_V22.Simplex
             return idx < n ? $"x{idx + 1}" : $"S{idx - n + 1}";
         }
 
-        // Snapshot (now takes a title so we can tag pre/post/optimal)  // ***
         private void CaptureSnapshot(
-            string title,
-            double[] xB,
-            double[] y,
-            double[] rcX,
-            double[] rcS,
-            int enteringIdx,
-            double[] u,
-            double[] ratios,
-            int leavingRow,
-            double zWorking,
-            double zOriginal)
+    string title,
+    double[] xB,
+    double[] y,
+    double[] rcX_post,
+    double[] rcS_post,
+    int enteringIdx,
+    double enteringRC_pre,
+    double[] u_pre,
+    double[] ratios_pre,
+    List<int> basisForRatios_Pre,
+    int leavingRow,
+    int leavingVarIndex_Pre,
+    double zWorking,
+    double zOriginal)
         {
             var sb = new StringBuilder();
             sb.AppendLine(title);
@@ -294,41 +313,40 @@ namespace LPR_381_Group_V22.Simplex
             sb.AppendLine($"Problem type: {(isMinimization ? "MIN (solving by MAX of -c)" : "MAX")}");
             sb.AppendLine();
 
-            // Dual prices
+            // Dual prices (POST-pivot)
             sb.AppendLine("Dual prices (y = c_B^T B^{-1}):");
             sb.AppendLine(string.Join("\t", y.Select(NumFormat.N3)));
             sb.AppendLine();
 
-            // Reduced costs for x and slacks
+            // Reduced costs (POST-pivot)
             sb.AppendLine("Reduced costs:");
             sb.Append("  x: ");
-            sb.AppendLine(string.Join("\t", rcX.Select(NumFormat.N3)));
+            sb.AppendLine(string.Join("\t", rcX_post.Select(NumFormat.N3)));
             sb.Append("  s: ");
-            sb.AppendLine(string.Join("\t", rcS.Select(NumFormat.N3)));
+            sb.AppendLine(string.Join("\t", rcS_post.Select(NumFormat.N3)));
             sb.AppendLine();
 
             if (enteringIdx >= 0)
             {
                 string enteringLabel = VarLabel(enteringIdx, numVariables);
-                double enteringRC = (enteringIdx < numVariables) ? rcX[enteringIdx] : rcS[enteringIdx - numVariables];
-                sb.AppendLine($"Entering variable: {enteringLabel}  (reduced cost = {NumFormat.N3(enteringRC)})");
-                sb.AppendLine("Direction u = B^{-1} a_enter:");
-                sb.AppendLine(string.Join("\t", u.Select(NumFormat.N3)));
+                sb.AppendLine($"Entering variable (chosen pre-pivot): {enteringLabel}  (reduced cost pre = {NumFormat.N3(enteringRC_pre)})");
+                sb.AppendLine("Direction u = B^{-1} a_enter (pre-pivot):");
+                sb.AppendLine(string.Join("\t", u_pre.Select(NumFormat.N3)));
                 sb.AppendLine();
 
-                sb.AppendLine("Ratio test (xB_i / u_i; ∞ if u_i ≤ 0):");
-                for (int i = 0; i < numConstraints; i++)
+                sb.AppendLine("Ratio test (xB_i / u_i; ∞ if u_i ≤ 0)  [labels = pre-pivot basis]:");
+                for (int i = 0; i < basisForRatios_Pre.Count; i++)
                 {
-                    string rowLbl = VarLabel(basicVariables[i], numVariables);
-                    string rstr = double.IsPositiveInfinity(ratios[i]) ? "∞" : NumFormat.N3(ratios[i]);
+                    string rowLbl = VarLabel(basisForRatios_Pre[i], numVariables);
+                    string rstr = double.IsPositiveInfinity(ratios_pre[i]) ? "∞" : NumFormat.N3(ratios_pre[i]);
                     sb.AppendLine($"{rowLbl}: {rstr}");
                 }
 
-                if (leavingRow >= 0)
+                if (leavingRow >= 0 && leavingVarIndex_Pre >= 0)
                 {
-                    string leavingLabel = VarLabel(basicVariables[leavingRow], numVariables);
-                    double pivot = u[leavingRow];
-                    sb.AppendLine($"Leaving variable: {leavingLabel}  (pivot = {NumFormat.N3(pivot)})");
+                    string leavingLabelPre = VarLabel(leavingVarIndex_Pre, numVariables);
+                    double pivot = u_pre[leavingRow];
+                    sb.AppendLine($"Pivot (pre→post): {leavingLabelPre}  →  {enteringLabel}    (pivot = {NumFormat.N3(pivot)})");
                     sb.AppendLine();
                 }
             }
@@ -338,7 +356,7 @@ namespace LPR_381_Group_V22.Simplex
             sb.AppendLine($"Original objective Z_original ({(isMinimization ? "MIN" : "MAX")}): {NumFormat.N3(zOriginal)}");
             sb.AppendLine();
 
-            // A compact revised-tableau view: B^{-1}A | B^{-1} | RHS
+            // Tableau rows (POST-pivot: B^{-1}A | B^{-1} | RHS)
             var BInvA = MultiplyMatrices(BInverse, A);
             var BInv = (double[,])BInverse.Clone();
 
@@ -347,13 +365,13 @@ namespace LPR_381_Group_V22.Simplex
             for (int j = 0; j < numConstraints; j++) sb.Append($"S{j + 1}\t");
             sb.AppendLine("RHS");
 
-            // Z row (reduced costs and working z)
+            // Z~ row uses POST-pivot reduced costs and Z
             sb.Append("Z~\t");
-            for (int j = 0; j < numVariables; j++) sb.Append($"{NumFormat.N3(rcX[j])}\t");
-            for (int j = 0; j < numConstraints; j++) sb.Append($"{NumFormat.N3(rcS[j])}\t");
+            for (int j = 0; j < numVariables; j++) sb.Append($"{NumFormat.N3(rcX_post[j])}\t");
+            for (int j = 0; j < numConstraints; j++) sb.Append($"{NumFormat.N3(rcS_post[j])}\t");
             sb.AppendLine(NumFormat.N3(zWorking));
 
-            // Constraint rows (label from CURRENT basis)
+            // Constraint rows: label with the POST-pivot basic variables (current basis)
             for (int i = 0; i < numConstraints; i++)
             {
                 int v = basicVariables[i];
@@ -368,7 +386,7 @@ namespace LPR_381_Group_V22.Simplex
             IterationSnapshots.Add(sb.ToString());
         }
 
-        // ---------- Linear algebra helpers ----------
+        // Linear algebra helpers
         private static double[] GetColumn(double[,] M, int col)
         {
             int rows = M.GetLength(0);
@@ -434,9 +452,6 @@ namespace LPR_381_Group_V22.Simplex
     {
         private const double EPS = 1e-12;
 
-       
-        // Round to 3 decimals; print integers without decimals; trim trailing zeros.
-        
         public static string N3(double x)
         {
             if (Math.Abs(x) < EPS) x = 0.0;
