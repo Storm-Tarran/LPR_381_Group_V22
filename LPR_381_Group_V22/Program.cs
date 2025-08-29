@@ -455,13 +455,66 @@ namespace LPR_381_Group_V22
 
                     case "5":
                         Console.WriteLine("Solving with Branch and Bound Knapsack Algorithm...");
+
+                        int capacity = 40;
+                        int[] weights = { 11, 8, 6, 14, 10, 10 };
+                        int[] values = { 2, 3, 3, 5, 2, 4 };
+
+                        Console.WriteLine("Knapsack Problem");
+                        Console.WriteLine($"Capacity: {capacity}");
+                        Console.WriteLine("Items (Value, Weight):");
+                        for (int i = 0; i < values.Length; i++)
+                            Console.WriteLine($"  Item {i + 1}: Value={values[i]}, Weight={weights[i]}");
+                        Console.WriteLine();
+
+                        var solver = new KnapsackBranchBoundSolver(
+                            capacity,
+                            weights.Select(w => (double)w).ToArray(),
+                            values.Select(v => (double)v).ToArray()
+                        );
+
+                        double branchBoundResult = solver.Solve();
+
+                        Console.WriteLine("=== Branch and Bound Detailed Steps ===");
+                        solver.PrintIterations();
+
+                        // Show chosen items mapped back to original indices
+                        var chosen = solver.GetSelectedItemsOriginal();
+                        Console.WriteLine("\nChosen items (original numbering):");
+                        int totalW = 0;
+                        foreach (var it in chosen)
+                        {
+                            Console.WriteLine($"  x{it.Id + 1} = 1  (Value={it.Value}, Weight={it.Weight})");
+                            totalW += (int)it.Weight;
+                        }
+                        Console.WriteLine($"Total Weight = {totalW}");
+                        Console.WriteLine($"Branch & Bound Best Value Z* = {branchBoundResult}");
+
+                        Console.WriteLine("\n=== Comparison with Dynamic Programming ===");
+                        double dp = KnapsackBranchBoundSolver.Solve(capacity, weights, values);
+                        Console.WriteLine($"Dynamic Programming Result: {dp}");
+                        Console.WriteLine($"Results Match: {Math.Abs(dp - branchBoundResult) < 1e-6}");
                         break;
-                       
+
                     case "6":
                         Console.Clear();
                         Console.WriteLine("Solving a Non-Linear Problem...");
                         var bonusQuestion = new BonusQuestion();
-                        bonusQuestion.Solve();
+                        Console.WriteLine("How would you like to solve this problem?");
+                        Console.WriteLine("1. Minimization");
+                        //string intput1 = Console.ReadLine();
+                        Console.WriteLine("2. Maximization");
+                        string input = Console.ReadLine();
+                        if(input == "1")
+                        {
+                            bonusQuestion.SolveMin();
+
+                        }
+                        else
+                        {
+                            bonusQuestion.SolveMax();
+                        }
+
                         break;
 
                     case "7":

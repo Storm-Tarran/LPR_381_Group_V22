@@ -66,7 +66,7 @@ namespace LPR_381_Group_V22.NonLinear
 
         }
 
-        public double Solve()
+        public double SolveMin()
         {
             Func<double, double> f = x => x * x;
 
@@ -120,6 +120,67 @@ namespace LPR_381_Group_V22.NonLinear
             Console.WriteLine(GoldenTable.FormatGoldenTable(rows, 10));
             double optimal = (xHigh + xLow)/2;
             double formula = Math.Pow(optimal,2);
+            Console.WriteLine($"The optimal value is: {optimal} and formula value is: {formula}");
+            Console.WriteLine("Press any key to return to the main menu...");
+            Console.ReadKey();
+
+            return 0.5 * (xHigh + xLow); // Return the midpoint of the final interval as the estimated minimum
+        }
+
+        public double SolveMax()
+        {
+            Func<double, double> f = x => x * x;
+
+            double xLow = 0; //Start Interval
+            double xHigh = 2; //End Interval
+
+            var rows = new List<GoldenIteration>();
+
+            for (int i = 0; i <= 40; i++)
+            {
+                double firstlow = xLow, firstHigh = xHigh;
+
+                double distance = ratio * (xHigh - xLow); // ratio * (xHigh - xLow)
+                double x1 = xLow + distance; // xLow + distance
+                double x2 = xHigh - distance; // xHigh - distance
+                double f_x1 = f(x1);
+                double f_x2 = f(x2);
+                double gap = xHigh - xLow;
+                string choice;
+
+                if (f_x1 > f_x2)
+                {
+                    choice = $"Keep [{xLow:F3}, {x1:F3}]";
+                    xLow = x2;
+                }
+                else
+                {
+                    choice = $"Keep [{xHigh:F3}, {x1:F3}]";
+                    xHigh = x1;
+                }
+
+                rows.Add(new GoldenIteration
+                {
+                    Iteration = i,
+                    xLower = firstlow,
+                    xHigher = firstHigh,
+                    Distance = distance,
+                    X1 = x1,
+                    X2 = x2,
+                    f_X1 = f_x1,
+                    f_X2 = f_x2,
+                    IntervalLength_Gap = gap,
+                    Choice = choice
+                });
+
+                if (gap <= 0.05)
+                    break;
+            }
+
+            Console.WriteLine("\nGolden-Section Search: f(x) = x^2, start [0, 2]");
+            Console.WriteLine(GoldenTable.FormatGoldenTable(rows, 10));
+            double optimal = (xHigh + xLow) / 2;
+            double formula = Math.Pow(optimal, 2);
             Console.WriteLine($"The optimal value is: {optimal} and formula value is: {formula}");
             Console.WriteLine("Press any key to return to the main menu...");
             Console.ReadKey();
