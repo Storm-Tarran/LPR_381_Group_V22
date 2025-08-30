@@ -5,15 +5,18 @@ using System.Linq;
 
 namespace LPR_381_Group_V22.SensitivityAnalysis
 {
-
     internal class SensitivityAnalyzer
     {
-        private double[,] tableau;             
-        private List<double> solutionVector;  
-        private double finalZ;
+       
+        private double[,] tableau;
+        private List<double> solutionVector; 
+        private double finalZ;               
         private int numRows;
         private int numCols;
-        private readonly List<int> basicVars;  
+
+       
+        private readonly List<int> basicVars;
+
         private const double EPS = 1e-9;
 
         public SensitivityAnalyzer(double[,] finalTableau, List<double> solution, double zValue, List<int> basicVariables)
@@ -24,34 +27,36 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             numRows = tableau.GetLength(0);
             numCols = tableau.GetLength(1);
             basicVars = new List<int>(basicVariables);
-            tableau[0, numCols - 1] = finalZ; // keep Z consistent
+
+            // Ensure Z on RHS row 0 is set
+            tableau[0, numCols - 1] = finalZ;
+
+            // Basis might be stale, rebuild it from the tableau
+            RebuildBasicsFromTableau();
+
+            // Optional: warn if your first few variables are supposed to be binary
+            ValidateBinaryConstraints();
         }
 
+        
 
-        private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+        private void ValidateBinaryConstraints()
+        {
+            
+            for (int i = 0; i < Math.Min(solutionVector.Count, 6); i++)
+            {
+                if (Math.Abs(solutionVector[i] - Math.Round(solutionVector[i])) > EPS)
+                    Console.WriteLine($"Warning: x{i + 1} = {solutionVector[i]:0.###} violates binary constraint.");
+            }
+        }
+
+        private string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
         private string ColLabel(int col)
         {
             int m = numRows - 1;
             int n = numCols - m - 1;
             return col < n ? $"x{col + 1}" : $"s{col - n + 1}";
-        }
-
-        private int GetBasicRow(int col)
-        {
-            for (int i = 1; i < numRows; i++)
-            {
-                if (Math.Abs(tableau[i, col] - 1.0) < 1e-9 && IsPivotColumn(i, col))
-                    return i;
-            }
-            return -1;
-        }
-
-        private bool IsPivotColumn(int pivotRow, int col)
-        {
-            for (int i = 1; i < numRows; i++)
-                if (i != pivotRow && Math.Abs(tableau[i, col]) > 1e-9) return false;
-            return true;
         }
 
         private int SlackColForConstraint(int i /*1..m*/)
@@ -61,25 +66,31 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             return n + (i - 1);
         }
 
-        private double[] ShadowPrices()
+        public int GetBasicRow(int col)
         {
-            int m = numRows - 1;
-            var y = new double[m];
-            for (int i = 1; i <= m; i++)
+            for (int i = 1; i < numRows; i++)
             {
-                int sCol = SlackColForConstraint(i);
-                y[i - 1] = -tableau[0, sCol];
+                if (Math.Abs(tableau[i, col] - 1.0) < EPS && IsPivotColumn(i, col))
+                    return i;
             }
-            return y;
+            return -1;
+        }
+
+        private bool IsPivotColumn(int pivotRow, int col)
+        {
+            for (int i = 1; i < numRows; i++)
+                if (i != pivotRow && Math.Abs(tableau[i, col]) > EPS) return false;
+            return true;
         }
 
         private bool IsOptimal()
         {
+            // With Z−C stored, for a maximization model: optimal if all NON-BASIC reduced costs >= 0
             var basicSet = new HashSet<int>(basicVars);
             for (int j = 0; j < numCols - 1; j++)
             {
-                if (basicSet.Contains(j)) continue; // ignore basic columns in optimality test
-                if (tableau[0, j] < -1e-12) return false;
+                if (basicSet.Contains(j)) continue;
+                if (tableau[0, j] < -EPS) return false;
             }
             return true;
         }
@@ -89,10 +100,10 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             double piv = tableau[leaveRow, enterCol];
             if (Math.Abs(piv) < EPS) throw new InvalidOperationException("Zero pivot encountered.");
 
-            // Normalize pivot row
+            // normalize pivot row
             for (int j = 0; j < numCols; j++) tableau[leaveRow, j] /= piv;
 
-            // Eliminate from other rows
+            // eliminate column in all other rows (including Z-row)
             for (int i = 0; i < numRows; i++)
             {
                 if (i == leaveRow) continue;
@@ -102,7 +113,7 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
                     tableau[i, j] -= factor * tableau[leaveRow, j];
             }
 
-            // Update basics (basis for row = leaveRow is now enterCol)
+            // update basis record
             int idx = leaveRow - 1;
             if (idx >= 0 && idx < basicVars.Count) basicVars[idx] = enterCol;
         }
@@ -112,20 +123,20 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             int iter = 0;
             while (!IsOptimal())
             {
-                if (iter++ > maxIter)
-                    throw new InvalidOperationException("Re-optimization exceeded iteration limit.");
+                if (iter++ > maxIter) throw new InvalidOperationException("Re-optimization exceeded iteration limit.");
 
-                // Entering: most negative reduced cost
+                // choose entering column: most negative reduced cost (Z−C)
                 int enter = -1;
                 double mostNeg = 0.0;
                 for (int j = 0; j < numCols - 1; j++)
                 {
+                    if (basicVars.Contains(j)) continue;
                     double rc = tableau[0, j];
                     if (rc < mostNeg) { mostNeg = rc; enter = j; }
                 }
                 if (enter == -1) break;
 
-                // Leaving: minimum ratio test on positive coefficients
+                // leaving by min ratio
                 int leave = -1;
                 double bestRatio = double.PositiveInfinity;
                 for (int i = 1; i < numRows; i++)
@@ -134,7 +145,7 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
                     if (aij > EPS)
                     {
                         double ratio = tableau[i, numCols - 1] / aij;
-                        if (ratio < bestRatio - 1e-12) { bestRatio = ratio; leave = i; }
+                        if (ratio < bestRatio - EPS) { bestRatio = ratio; leave = i; }
                     }
                 }
                 if (leave == -1) throw new InvalidOperationException("Unbounded during re-optimization.");
@@ -144,23 +155,105 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
 
             finalZ = tableau[0, numCols - 1];
 
-            // rebuild x*
+            // rebuild primal solution from basis
             solutionVector = new List<double>(new double[numCols - 1]);
             for (int j = 0; j < numCols - 1; j++)
             {
                 int r = GetBasicRow(j);
                 solutionVector[j] = (r == -1) ? 0.0 : tableau[r, numCols - 1];
             }
+            ValidateBinaryConstraints();
         }
 
-        private void PrintTableau(string title = null)
+        private void DualSimplexIfNeeded(int maxIter = 10000)
         {
-            if (!string.IsNullOrWhiteSpace(title)) Console.WriteLine($"\n=== {title} ===");
+            // If any RHS is negative, do dual simplex until all RHS >= 0
+            int iter = 0;
+            while (true)
+            {
+                int leave = -1;
+                double mostNeg = 0.0;
+                for (int i = 1; i < numRows; i++)
+                {
+                    double bi = tableau[i, numCols - 1];
+                    if (bi < mostNeg - EPS) { mostNeg = bi; leave = i; }
+                }
+                if (leave == -1) break; // all RHS >= 0
+
+                if (iter++ > maxIter) throw new InvalidOperationException("Dual simplex exceeded iteration limit.");
+
+                // choose enter: a_ij < 0 and minimize (Z−C)_j / (-a_ij)
+                int enter = -1;
+                double bestRatio = double.PositiveInfinity;
+                for (int j = 0; j < numCols - 1; j++)
+                {
+                    double aij = tableau[leave, j];
+                    if (aij < -EPS)
+                    {
+                        double ratio = tableau[0, j] / (-aij);
+                        if (ratio < bestRatio - EPS) { bestRatio = ratio; enter = j; }
+                    }
+                }
+                if (enter == -1) throw new InvalidOperationException("Infeasible after RHS change (dual simplex).");
+
+                Pivot(enter, leave);
+            }
+        }
+
+        private void ResolveAll()
+        {
+            RebuildBasicsFromTableau();
+            DualSimplexIfNeeded();
+            ReOptimize();
+        }
+
+        
+
+        private double[] ShadowPrices()
+        {
+            int m = numRows - 1;
+            var y = new double[m];
+            for (int i = 1; i <= m; i++)
+            {
+                int sCol = SlackColForConstraint(i);
+                y[i - 1] = tableau[0, sCol]; 
+            }
+            return y;
+        }
+
+        
+        
+        private double[] RecoverObjectiveC()
+        {
             int m = numRows - 1;
             int n = numCols - m - 1;
+            var y = ShadowPrices();
 
-            // header
+            // Ã = B^{-1}A decision-part
+            double[,] Atilde = new double[m, n];
+            for (int i = 1; i <= m; i++)
+                for (int j = 0; j < n; j++)
+                    Atilde[i - 1, j] = tableau[i, j];
+
+            var c = new double[n];
+            for (int j = 0; j < n; j++)
+            {
+                double ATy = 0.0;
+                for (int i = 0; i < m; i++) ATy += Atilde[i, j] * y[i];
+                c[j] = ATy - tableau[0, j]; // (A^T y) − (Z−C)
+            }
+            return c;
+        }
+
+       
+
+        public void PrintTableau(string title = null)
+        {
+            if (!string.IsNullOrWhiteSpace(title)) Console.WriteLine($"\n=== {title} ===");
+
             var headers = new List<string>();
+            int m = numRows - 1;
+            int n = numCols - m - 1;
             for (int j = 0; j < n; j++) headers.Add(ColLabel(j));
             for (int j = n; j < n + m; j++) headers.Add(ColLabel(j));
             headers.Add("RHS/Z");
@@ -172,10 +265,14 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
                 for (int j = 0; j < numCols; j++) row.Add(F(tableau[i, j]));
                 Console.WriteLine(string.Join("\t", row));
             }
+            Console.WriteLine($"Current Solution: Z = {F(finalZ)}");
+            for (int j = 0; j < numCols - 1; j++)
+                Console.WriteLine($"{ColLabel(j)} = {F(solutionVector[j])}");
         }
 
-      
+       
 
+        
         public void DisplayRangeNonBasic()
         {
             Console.Write("Enter Non-Basic Variable index (1-based): ");
@@ -188,28 +285,25 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
                 return;
             }
 
-            double cbar = tableau[0, index];
+            double cbar = tableau[0, index]; // Z−C
             Console.WriteLine($"Reduced Cost for {ColLabel(index)}: {F(cbar)}");
 
-            // MAX with x_j = 0 nonbasic: keep basis if c̄_j(new) >= 0.
-            // Changing only c_j shifts c̄ by the same amount, so:
-            // Allowable decrease = c̄_j; allowable increase = +∞.
-            if (cbar > 0)
+            if (cbar > EPS)
                 Console.WriteLine($"Range for c{index + 1}: can DECREASE by at most {F(cbar)}, INCREASE without bound.");
             else if (Math.Abs(cbar) <= EPS)
                 Console.WriteLine($"Range for c{index + 1}: at boundary (c̄=0). Any decrease makes {ColLabel(index)} enter; any increase is fine.");
             else
-                Console.WriteLine("Warning: this tableau is not optimal (negative reduced cost found). Consider re-optimizing.");
+                Console.WriteLine("Warning: tableau not optimal (negative reduced cost found). Consider re-optimizing.");
         }
 
-       
+        
         public void ChangeNonBasicReducedCost()
         {
             Console.Write("Enter index of Non-Basic Variable to change (1-based): ");
             if (!int.TryParse(Console.ReadLine(), out int idxRaw)) { Console.WriteLine("Invalid number."); return; }
             int index = idxRaw - 1;
 
-            Console.Write("Enter NEW reduced cost value c̄_j: ");
+            Console.Write("Enter NEW reduced cost value c̄_j (Z−C): ");
             if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double newCbar))
             { Console.WriteLine("Invalid number."); return; }
 
@@ -227,7 +321,6 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
         }
 
        
-
         public void DisplayRangeBasic()
         {
             Console.Write("Enter Basic Variable index (1-based, referring to its COLUMN): ");
@@ -241,40 +334,39 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             }
 
             int r = GetBasicRow(index);
-            if (r == -1)
-            {
-                Console.WriteLine("Error: Basic variable not found in tableau.");
-                return;
-            }
+            if (r == -1) { Console.WriteLine("Error: Basic variable not found in tableau."); return; }
 
-            // c̄_j(new) = c̄_j(old) - Δ * a_rj  (only c_Bk changed by Δ)
+            
             double deltaLower = double.NegativeInfinity;
             double deltaUpper = double.PositiveInfinity;
 
             for (int j = 0; j < numCols - 1; j++)
             {
-                if (j == index) continue; // basic column
+                if (j == index || basicVars.Contains(j)) continue;
                 double a_rj = tableau[r, j];
                 double cbar_j = tableau[0, j];
 
                 if (a_rj > EPS)
-                    deltaUpper = Math.Min(deltaUpper, cbar_j / a_rj);
+                   
+                    deltaLower = Math.Max(deltaLower, -cbar_j / a_rj);
                 else if (a_rj < -EPS)
-                    deltaLower = Math.Max(deltaLower, cbar_j / a_rj);
+                    
+                    deltaUpper = Math.Min(deltaUpper, -cbar_j / a_rj);
             }
 
             Console.WriteLine($"Allowable change Δ for {ColLabel(index)}’s objective coeff that keeps basis optimal: [{F(deltaLower)}, {F(deltaUpper)}]");
             Console.WriteLine("Interpretation: set c_B(new) = c_B(old) + Δ within this interval to preserve basis.");
         }
 
+       
         public void ChangeBasic()
         {
             Console.Write("Enter Basic Variable index (1-based, referring to its COLUMN): ");
             if (!int.TryParse(Console.ReadLine(), out int colRaw)) { Console.WriteLine("Invalid number."); return; }
             int col = colRaw - 1;
 
-            Console.Write("Enter NEW objective coefficient value c_B(new): ");
-            if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double newVal))
+            Console.Write("Enter change Δ for objective coefficient (c_B(new) = c_B(old) + Δ): ");
+            if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double delta))
             { Console.WriteLine("Invalid number."); return; }
 
             if (col < 0 || col >= numCols - 1 || !basicVars.Contains(col))
@@ -286,17 +378,12 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             int r = GetBasicRow(col);
             if (r == -1) { Console.WriteLine("Error: Basic variable not found in tableau."); return; }
 
-            // c_B(old) = y_r with y = shadow prices, and y_r = -c̄(slack_r)
-            int constraintIndex = r;
-            int slackCol = SlackColForConstraint(constraintIndex);
-            double y_r = -tableau[0, slackCol];
-            double cBold = y_r;
-            double delta = newVal - cBold;
+            
+            for (int j = 0; j < numCols - 1; j++)
+                tableau[0, j] += delta * tableau[r, j];
 
-            // Objective row update: row0(new) = row0(old) - Δ * row_r; Z(new) = Z(old) + Δ * x_B
-            for (int j = 0; j < numCols; j++)
-                tableau[0, j] -= delta * tableau[r, j];
-
+            
+            tableau[0, numCols - 1] += delta * tableau[r, numCols - 1];
             finalZ = tableau[0, numCols - 1];
 
             Console.WriteLine($"Applied Δ = {F(delta)} to c_B for {ColLabel(col)}. Objective row updated; Z adjusted by Δ*x_B.");
@@ -305,7 +392,7 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             PrintTableau("After c_B change (resolved)");
         }
 
-
+        
         public void DisplayRangeRHS()
         {
             Console.Write("Enter constraint index (1-based): ");
@@ -319,16 +406,15 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             double deltaLower = double.NegativeInfinity;
             double deltaUpper = double.PositiveInfinity;
 
-            // x_B(new) = x_B + Δ * (kth column of B^{-1}) which is the slack_k column in final tableau rows.
             for (int i = 1; i < numRows; i++)
             {
                 double coeff = tableau[i, sCol];
                 double bi = tableau[i, numCols - 1];
 
                 if (coeff > EPS)
-                    deltaLower = Math.Max(deltaLower, -bi / coeff);
+                    deltaLower = Math.Max(deltaLower, -bi / coeff);     
                 else if (coeff < -EPS)
-                    deltaUpper = Math.Min(deltaUpper, -bi / coeff);
+                    deltaUpper = Math.Min(deltaUpper, -bi / coeff);     
             }
 
             double currentRHS = tableau[k, numCols - 1];
@@ -337,6 +423,7 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             Console.WriteLine($"So b_{k} may vary within [{F(currentRHS + deltaLower)}, {F(currentRHS + deltaUpper)}] without changing the basis.");
         }
 
+        
         public void ChangeRHS()
         {
             Console.Write("Enter constraint index to change RHS (1-based): ");
@@ -347,58 +434,42 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double newB))
             { Console.WriteLine("Invalid number."); return; }
 
+            
+            var snap = (double[,])tableau.Clone();
+            var basicsSnap = new List<int>(basicVars);
+            double oldZ = finalZ;
+
             double oldB = tableau[k, numCols - 1];
             double delta = newB - oldB;
 
             int sCol = SlackColForConstraint(k);
+
+            
             for (int i = 1; i < numRows; i++)
                 tableau[i, numCols - 1] += delta * tableau[i, sCol];
 
+            
             double[] y = ShadowPrices();
             tableau[0, numCols - 1] += y[k - 1] * delta;
             finalZ = tableau[0, numCols - 1];
 
-            // Restore feasibility (if some RHS < 0) using dual simplex; then ensure optimality
-            ResolveAll();
-            PrintTableau("After RHS change (resolved)");
-        }
-
-        private void DualSimplexIfNeeded(int maxIter = 10000)
-        {
-            int iter = 0;
-            while (true)
+            try
             {
-                int leave = -1;
-                double mostNeg = 0.0;
-                for (int i = 1; i < numRows; i++)
-                {
-                    double bi = tableau[i, numCols - 1];
-                    if (bi < mostNeg - 1e-12) { mostNeg = bi; leave = i; }
-                }
-                if (leave == -1) break; // feasible
-
-                if (iter++ > maxIter)
-                    throw new InvalidOperationException("Dual simplex exceeded iteration limit.");
-
-                int enter = -1;
-                double bestRatio = double.PositiveInfinity;
-                for (int j = 0; j < numCols - 1; j++)
-                {
-                    double aij = tableau[leave, j];
-                    if (aij < -EPS)
-                    {
-                        double ratio = tableau[0, j] / (-aij);
-                        if (ratio < bestRatio - 1e-12) { bestRatio = ratio; enter = j; }
-                    }
-                }
-                if (enter == -1) throw new InvalidOperationException("Infeasible after RHS change (no entering col).");
-
-                Pivot(enter, leave);
+                DualSimplexIfNeeded();
+                ReOptimize();
+                PrintTableau("After RHS change (resolved)");
+            }
+            catch
+            {
+                tableau = snap;
+                finalZ = oldZ;
+                basicVars.Clear(); basicVars.AddRange(basicsSnap);
+                Console.WriteLine("This RHS change makes the model infeasible for the current basis. "
+                                  + "Use option 5 (RHS range) to see the allowable interval.");
             }
         }
 
-       
-
+     
         public void DisplayRangeNonBasicColumn()
         {
             Console.Write("Enter row (constraint, 1-based): ");
@@ -416,13 +487,13 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             }
 
             double aij = tableau[row, col];
-            double cbar = tableau[0, col];
-            double[] y = ShadowPrices();
-            double yi = y[row - 1];
+            double cbar = tableau[0, col];      
+            double yi = ShadowPrices()[row - 1];
 
+            
             double deltaLower = double.NegativeInfinity, deltaUpper = double.PositiveInfinity;
-            if (yi > EPS) deltaUpper = Math.Min(deltaUpper, cbar / yi);
-            else if (yi < -EPS) deltaLower = Math.Max(deltaLower, cbar / yi);
+            if (yi > EPS) deltaLower = Math.Max(deltaLower, -cbar / yi);
+            else if (yi < -EPS) deltaUpper = Math.Min(deltaUpper, -cbar / yi);
 
             Console.WriteLine($"Allowable Δ for a[{row},{ColLabel(col)}] keeping basis optimal: [{F(deltaLower)}, {F(deltaUpper)}]");
             Console.WriteLine($"So a[{row},{ColLabel(col)}] may vary within [{F(aij + deltaLower)}, {F(aij + deltaUpper)}].");
@@ -452,24 +523,22 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             double delta = newVal - oldVal;
             tableau[row, col] = newVal;
 
-            double[] y = ShadowPrices();
-            double yi = y[row - 1];
-            tableau[0, col] -= yi * delta;
+            double yi = ShadowPrices()[row - 1];
+            tableau[0, col] += yi * delta;        
 
             ResolveAll();
             PrintTableau("After a_ij change (resolved)");
         }
 
-      
-
+        
         public void AddNewActivity()
         {
             Console.Write("Enter objective coefficient for new variable c_new (e.g., 5): ");
             if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double cNew))
             { Console.WriteLine("Invalid number."); return; }
 
-            int m = numRows - 1;                 // #constraints
-            int n = numCols - m - 1;             // #decision vars (current)
+            int m = numRows - 1;
+            int n = numCols - m - 1;
 
             Console.WriteLine("Enter technological coefficients a_i for each constraint row:");
             double[] aNew = new double[m];
@@ -481,59 +550,48 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
                 aNew[i - 1] = v;
             }
 
-            // Compute reduced cost: c̄_new = c_new - y^T a_new
-            var y = ShadowPrices();
-            double yTa = 0.0;
-            for (int i = 0; i < m; i++) yTa += y[i] * aNew[i];
-            double cbarNew = cNew - yTa;
+            double[] y = ShadowPrices();
+            double yTa = 0.0; for (int i = 0; i < m; i++) yTa += y[i] * aNew[i];
+            double cbarNew = yTa - cNew; 
 
-            // Insert new decision column at index n, shifting slacks to the right (RHS/Z stays last)
-            int oldCols = numCols;
-            int newCols = oldCols + 1;
-            var newT = new double[numRows, newCols];
-
-            // Copy existing decision columns [0 .. n-1]
+            
+            var newT = new double[numRows, numCols + 1];
             for (int i = 0; i < numRows; i++)
-                for (int j = 0; j < n; j++)
-                    newT[i, j] = tableau[i, j];
+            {
+                
+                for (int j = 0; j < n; j++) newT[i, j] = tableau[i, j];
 
-            // Insert NEW decision column at j = n
-            newT[0, n] = cbarNew;          // reduced cost
-            for (int i = 1; i < numRows; i++)
-                newT[i, n] = aNew[i - 1];
+                
+                newT[i, n] = (i == 0) ? cbarNew : aNew[i - 1];
 
-            // Copy old slack block j = n .. oldCols-2 into j = n+1 .. newCols-2
-            for (int i = 0; i < numRows; i++)
-                for (int j = n; j < oldCols - 1; j++)
-                    newT[i, j + 1] = tableau[i, j];
+                
+                for (int j = n; j < numCols - 1; j++) newT[i, j + 1] = tableau[i, j];
 
-            // Copy RHS/Z to the last column
-            for (int i = 0; i < numRows; i++)
-                newT[i, newCols - 1] = tableau[i, oldCols - 1];
+                
+                newT[i, numCols] = tableau[i, numCols - 1];
+            }
 
-            // Commit
             tableau = newT;
-            numCols = newCols;
+            numCols++;
 
            
             for (int i = 0; i < basicVars.Count; i++)
-            {
-                if (basicVars[i] >= n) basicVars[i] += 1;
-            }
+                if (basicVars[i] >= n) basicVars[i]++;
 
-            Console.WriteLine($"Added new variable x{n + 1}: c = {cNew}, y^T a = {yTa:0.###}, c̄ = {cbarNew:0.###}. Re-optimizing if needed...");
-
-            Console.WriteLine($"Added new variable x{n + 1}: c = {cNew}, y^T a = {yTa:0.###}, c̄ = {cbarNew:0.###}. Resolving...");
+            Console.WriteLine($"Added new variable x{n + 1}: c = {F(cNew)}, y^T a = {F(yTa)}, c̄ = {F(cbarNew)}. Resolving...");
             ResolveAll();
             PrintTableau("After adding variable (resolved)");
-        
         }
 
+        
         public void AddNewConstraint()
         {
+            int oldM = numRows - 1;
+            int oldNPlusM = numCols - 1;
+
             Console.WriteLine("Enter technological coefficients for existing columns (excluding RHS):");
-            double[] tech = new double[numCols - 1];
-            for (int j = 0; j < numCols - 1; j++)
+            double[] tech = new double[oldNPlusM];
+            for (int j = 0; j < oldNPlusM; j++)
             {
                 Console.Write($"  col {ColLabel(j)} = ");
                 if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
@@ -545,53 +603,81 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
             if (!double.TryParse(Console.ReadLine(), NumberStyles.Float, CultureInfo.InvariantCulture, out double rhs))
             { Console.WriteLine("Invalid number."); return; }
 
-            // Expand by 1 row and 1 slack column (insert before RHS), push RHS/Z right
+            AddNewConstraintNonInteractive(tech, rhs);
+        }
+
+        public void AddNewConstraintNonInteractive(double[] tech, double rhs)
+        {
+            int oldM = numRows - 1;
+            int oldNPlusM = numCols - 1;
+
+            // Build new tableau with an extra slack column and one extra row
             var newT = new double[numRows + 1, numCols + 1];
 
-            // copy old
+            // copy existing
             for (int i = 0; i < numRows; i++)
             {
                 for (int j = 0; j < numCols - 1; j++) newT[i, j] = tableau[i, j];
-                newT[i, numCols] = tableau[i, numCols - 1];
+                newT[i, numCols] = tableau[i, numCols - 1]; // RHS
             }
 
-            // new row tech
-            for (int j = 0; j < numCols - 1; j++) newT[numRows, j] = tech[j];
+            // new slack column is identity in the new row
+            int newSlackCol = numCols - 1;
+            for (int i = 0; i < numRows + 1; i++)
+                newT[i, newSlackCol] = (i == numRows) ? 1.0 : 0.0;
 
-            // new slack column (before RHS/Z): 1 in new row, 0 elsewhere
-            for (int i = 0; i <= numRows; i++) newT[i, numCols - 1] = (i == numRows) ? 1.0 : 0.0;
-            newT[numRows, numCols] = rhs;  // RHS
-            newT[0, numCols - 1] = 0.0;    // reduced cost of the new slack
+            
+            for (int j = 0; j < oldNPlusM; j++)
+            {
+                double coeff = -tech[j];
+                for (int pos = 0; pos < oldM; pos++)
+                {
+                    int basicCol = basicVars[pos];
+                    coeff += tech[basicCol] * tableau[pos + 1, j];
+                }
+                newT[numRows, j] = coeff;
+            }
+
+            
+            double aX = 0.0;
+            for (int j = 0; j < Math.Min(tech.Length, solutionVector.Count); j++)
+                aX += tech[j] * solutionVector[j];
+
+            newT[numRows, numCols] = rhs - aX;
+
+            
+            newT[0, newSlackCol] = 0.0;
 
             tableau = newT;
             numRows++;
             numCols++;
-            basicVars.Add(numCols - 2); // new slack basic in new row
+            basicVars.Add(newSlackCol);
 
             Console.WriteLine($"Added new constraint (row {numRows - 1}). Resolving...");
             ResolveAll();
             PrintTableau("After adding constraint (resolved)");
         }
 
-        
-
+       
         public void DisplayShadowPrices()
         {
-            Console.WriteLine("Shadow Prices (y = -c̄_slack):");
+            Console.WriteLine("Shadow Prices y (Z−C on slack columns):");
             var y = ShadowPrices();
             for (int i = 0; i < y.Length; i++)
                 Console.WriteLine($"  Constraint {i + 1}: y_{i + 1} = {F(y[i])}");
         }
 
+        
         public void PerformDuality()
         {
             int m = numRows - 1;
             int n = numCols - m - 1;
 
-            double[] b = new double[m];
-            for (int i = 1; i <= m; i++) b[i - 1] = tableau[i, numCols - 1];
+            
+            double[] bPrime = new double[m];
+            for (int i = 1; i <= m; i++) bPrime[i - 1] = tableau[i, numCols - 1];
 
-            // Careful: rows in final tableau are B^{-1}A, not A. This is for display only.
+            
             double[,] Atilde = new double[m, n];
             for (int i = 1; i <= m; i++)
                 for (int j = 0; j < n; j++)
@@ -599,144 +685,47 @@ namespace LPR_381_Group_V22.SensitivityAnalysis
 
             var y = ShadowPrices();
 
-            // implied c = c̄ + A^T y  (using Atilde for display)
-            double[] c = new double[n];
+            
+            double[] chat = new double[n];
             for (int j = 0; j < n; j++)
             {
-                double ATy = 0.0;
-                for (int i = 0; i < m; i++) ATy += Atilde[i, j] * y[i];
-                c[j] = tableau[0, j] + ATy;
+                double ATy = 0.0; for (int i = 0; i < m; i++) ATy += Atilde[i, j] * y[i];
+                chat[j] = ATy - tableau[0, j];
             }
 
-            Console.WriteLine("Dual (display form — coefficients derived from final tableau):");
-            Console.WriteLine($"  minimize b^T y,  with y >= 0,  A^T y >= c");
-            Console.WriteLine($"  b = [{string.Join(", ", b.Select(F))}]");
+            Console.WriteLine("Dual (derived from final tableau; tableau stores Z−C):");
+            Console.WriteLine("  For max with ≤-type rows: minimize b^T y, s.t. A^T y ≥ c, y ≥ 0.");
             Console.WriteLine($"  y* = [{string.Join(", ", y.Select(F))}]");
-            Console.WriteLine("  Constraints per primal var j: (A^T y)_j >= c_j (display coefficients use B^{-1}A)");
-            for (int j = 0; j < n; j++)
-            {
-                var lhs = new List<string>();
-                for (int i = 0; i < m; i++) lhs.Add($"{F(Atilde[i, j])}*y{i + 1}");
-                Console.WriteLine($"    j={j + 1}: {string.Join(" + ", lhs)} >= {F(c[j])}");
-            }
-
-            double dualValue = 0.0;
-            for (int i = 0; i < m; i++) dualValue += b[i] * y[i];
-            Console.WriteLine($"  Primal Z* = {F(tableau[0, numCols - 1])}, Dual b^T y = {F(dualValue)}");
-            Console.WriteLine(Math.Abs(tableau[0, numCols - 1] - dualValue) <= 1e-6
-                ? "  Strong Duality holds."
-                : "  Warning: values differ (numerical issues or non-optimal tableau).");
+            Console.WriteLine($"  ĉ (consistent with tableau) = [{string.Join(", ", chat.Select(F))}]");
+            Console.WriteLine($"  Z* (from tableau) = {F(tableau[0, numCols - 1])}");
+            Console.WriteLine("  Note: b here equals B^{-1}b (tableau RHS), so we do not compare b^T y to Z* numerically.");
         }
-
-        
-
-        public double[,] CurrentTableau => (double[,])tableau.Clone();
-        public double CurrentZ => finalZ;
-        public IReadOnlyList<double> CurrentSolutionVector => solutionVector.AsReadOnly();
 
        
-        public void Recalculate()
-        {
-            DualSimplexIfNeeded();    // fix feasibility if any RHS < 0
-            if (!IsOptimal()) ReOptimize();
-            Console.WriteLine("\n=== Recalculate() complete (feasibility & optimality restored) ===");
-        }
 
         private void RebuildBasicsFromTableau()
         {
             int m = numRows - 1;
-            if (basicVars.Count != m)
-            {
-                basicVars.Clear();
-                for (int i = 0; i < m; i++) basicVars.Add(-1);
-            }
+            basicVars.Clear();
+            for (int i = 0; i < m; i++) basicVars.Add(-1);
 
             for (int i = 1; i <= m; i++)
             {
-                int pivotCol = -1;
                 for (int j = 0; j < numCols - 1; j++)
                 {
                     if (Math.Abs(tableau[i, j] - 1.0) < EPS && IsPivotColumn(i, j))
                     {
-                        pivotCol = j;
+                        basicVars[i - 1] = j;
                         break;
                     }
                 }
-                if (pivotCol != -1) basicVars[i - 1] = pivotCol;
             }
         }
 
-        // One-button restore: fix basis from tableau, then restore feasibility and optimality,
-        // and refresh Z and x*.
-        private void ResolveAll()
-        {
-            RebuildBasicsFromTableau();
-            DualSimplexIfNeeded();
-            ReOptimize(); // ReOptimize also refreshes finalZ & solutionVector
-        }
+       
 
-        private static void ClearAndShowOptimal(SensitivityAnalyzer sa, string header = null)
-        {
-            Console.Clear();
-            if (!string.IsNullOrWhiteSpace(header))
-            {
-                Console.WriteLine(header);
-                Console.WriteLine();
-            }
-
-            PrintOptimalTable(sa);
-
-        }
-
-        private static void PrintOptimalTable(SensitivityAnalyzer sa, int colWidth = 12)
-        {
-            var T = sa.CurrentTableau;
-            if (T == null)
-            {
-                Console.WriteLine("(No tableau available.)");
-                return;
-            }
-
-            int rows = T.GetLength(0);
-            int cols = T.GetLength(1);
-            if (cols <= 0 || rows <= 0)
-            {
-                Console.WriteLine("(Empty tableau.)");
-                return;
-            }
-
-            // Header
-            Console.Write("".PadLeft(6));
-            for (int j = 0; j < cols; j++)
-            {
-                string name = (j == cols - 1) ? "RHS" : $"c{j + 1}";
-                Console.Write($"{name}".PadLeft(colWidth));
-            }
-            Console.WriteLine();
-
-            // Rows: row 0 is Z, others are constraints
-            for (int i = 0; i < rows; i++)
-            {
-                string rowLabel = (i == 0) ? "Z" : $"r{i}";
-                Console.Write($"{rowLabel}".PadLeft(6));
-
-                for (int j = 0; j < cols; j++)
-                {
-                    double v = T[i, j];
-                    Console.Write(string.Format(CultureInfo.InvariantCulture,
-    "{0," + colWidth + ":0.###}", v));
-                }
-                Console.WriteLine();
-            }
-
-            Console.WriteLine();
-        }
-
-        private static void Pause()
-        {
-            Console.WriteLine("\nPress Enter to continue...");
-            Console.ReadLine();
-        }
-
+        public double[,] CurrentTableau => (double[,])tableau.Clone();
+        public double CurrentZ => finalZ;
+        public IReadOnlyList<double> CurrentSolutionVector => solutionVector.AsReadOnly();
     }
 }

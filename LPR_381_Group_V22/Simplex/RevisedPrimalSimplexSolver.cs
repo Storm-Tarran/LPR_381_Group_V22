@@ -11,16 +11,16 @@ namespace LPR_381_Group_V22.Simplex
     {
         private const double EPS = 1e-9;
 
-        
+
         private readonly double[] cOrig;
         private double[] c;
 
         // Ax = b data (standard form expects <= turned into slacks; x >= 0)
-        private readonly double[,] A; 
-        private readonly double[] b;   
+        private readonly double[,] A;
+        private readonly double[] b;
 
-        private readonly int numVariables;   
-        private readonly int numConstraints; 
+        private readonly int numVariables;
+        private readonly int numConstraints;
         private readonly bool isMinimization;
 
         // Basis bookkeeping 

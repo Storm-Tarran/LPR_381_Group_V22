@@ -143,70 +143,67 @@ namespace LPR_381_Group_V22
                         Console.ReadKey();
 
                         // Initialize SensitivityAnalyzer
-                        SensitivityAnalyzer sensitivityAnalyzer = new SensitivityAnalyzer(
-                         primalSolver.GetFinalTableau(),
-                         primalSolver.SolutionVector,
-                         primalSolver.FinalZ,
-                         primalSolver.BasicVariables);
+                        // Initialize SensitivityAnalyzer
+                        var sensitivityAnalyzer = new SensitivityAnalyzer(
+                            primalSolver.GetFinalTableau(),
+                            primalSolver.SolutionVector,
+                            primalSolver.FinalZ,
+                            primalSolver.BasicVariables);
 
+                        int numDecisionVariables = objective.Count;
 
+                        
+
+                        // Sensitivity analysis menu
                         bool backToMain = false;
-
                         while (!backToMain)
                         {
-                            Console.WriteLine("Sensitivity Analysis");
+                            Console.Clear();
+                            Console.WriteLine("=== Sensitivity Analysis Menu ===");
                             Console.WriteLine("1. Display the range of a selected Non-Basic Variable.");
                             Console.WriteLine("2. Change a non-basic variable");
                             Console.WriteLine("3. Display the range of a selected Basic Variable.");
                             Console.WriteLine("4. Change a basic variable");
                             Console.WriteLine("5. Display the range of a selected constraint right-hand-side value.");
-                            Console.WriteLine("6. Change a selected constraint right-hand-side value. ");
-                            Console.WriteLine("7. Display the range of a selected variable in a Non-Basic Variable column. ");
+                            Console.WriteLine("6. Change a selected constraint right-hand-side value.");
+                            Console.WriteLine("7. Display the range of a selected variable in a Non-Basic Variable column.");
                             Console.WriteLine("8. Change a selected variable in a Non-Basic Variable column");
                             Console.WriteLine("9. Add a new activity to an optimal solution.");
-                            Console.WriteLine("10. Add a new constraint to an optimal solution. ");
-                            Console.WriteLine("11. Display the shadow prices. ");
+                            Console.WriteLine("10. Add a new constraint to an optimal solution.");
+                            Console.WriteLine("11. Display the shadow prices.");
                             Console.WriteLine("12. Duality");
                             Console.WriteLine("13. Return to main menu");
                             Console.Write("Please select an option (1-13): ");
                             string choice2 = Console.ReadLine();
 
-
                             switch (choice2)
                             {
-
-
                                 case "1":
-
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Display Non-Basic Variable Range ===");
                                     sensitivityAnalyzer.DisplayRangeNonBasic();
-
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
-
                                     break;
 
                                 case "2":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Change Non-Basic Variable ===");
                                     sensitivityAnalyzer.ChangeNonBasicReducedCost();
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
-
                                     break;
 
                                 case "3":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Display Basic Variable Range ===");
                                     sensitivityAnalyzer.DisplayRangeBasic();
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
-
                                     break;
 
                                 case "4":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Change Basic Variable ===");
                                     sensitivityAnalyzer.ChangeBasic();
                                     Console.WriteLine("Press Enter to continue...");
@@ -214,7 +211,7 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "5":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Display RHS Range ===");
                                     sensitivityAnalyzer.DisplayRangeRHS();
                                     Console.WriteLine("Press Enter to continue...");
@@ -222,7 +219,7 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "6":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Change RHS ===");
                                     sensitivityAnalyzer.ChangeRHS();
                                     Console.WriteLine("Press Enter to continue...");
@@ -230,7 +227,7 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "7":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Display Non-Basic Column Range ===");
                                     sensitivityAnalyzer.DisplayRangeNonBasicColumn();
                                     Console.WriteLine("Press Enter to continue...");
@@ -238,7 +235,7 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "8":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Change Non-Basic Column ===");
                                     sensitivityAnalyzer.ChangeNonBasicColumn();
                                     Console.WriteLine("Press Enter to continue...");
@@ -246,25 +243,21 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "9":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Add New Activity ===");
-                                    sensitivityAnalyzer.AddNewActivity(); // this already re-optimizes if needed
-
-                                    // pull the recalculated results
+                                    sensitivityAnalyzer.AddNewActivity();
                                     var T = sensitivityAnalyzer.CurrentTableau;
                                     var Z = sensitivityAnalyzer.CurrentZ;
                                     var x = sensitivityAnalyzer.CurrentSolutionVector;
-
                                     Console.WriteLine($"Updated Z* = {Z:0.###}");
-                                    for (int i = 0; i < Math.Min(x.Count, inputFileParser.ObjectiveCoefficients.Count); i++)
+                                    for (int i = 0; i < Math.Min(x.Count, numDecisionVariables); i++)
                                         Console.WriteLine($"x{i + 1} = {x[i]:0.###}");
-
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
                                     break;
 
                                 case "10":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Add New Constraint ===");
                                     sensitivityAnalyzer.AddNewConstraint();
                                     Console.WriteLine("Press Enter to continue...");
@@ -272,7 +265,7 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "11":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Display Shadow Prices ===");
                                     sensitivityAnalyzer.DisplayShadowPrices();
                                     Console.WriteLine("Press Enter to continue...");
@@ -280,112 +273,83 @@ namespace LPR_381_Group_V22
                                     break;
 
                                 case "12":
-
+                                    Console.Clear();
                                     Console.WriteLine("=== Perform Duality ===");
                                     sensitivityAnalyzer.PerformDuality();
                                     Console.WriteLine("Press Enter to continue...");
                                     Console.ReadLine();
                                     break;
-                                case "13":
 
+                                case "13":
                                     backToMain = true;
                                     Console.Clear();
-                                    Console.ReadKey();
-
-
                                     break;
-
 
                                 default:
-                                    Console.WriteLine("Invalid choice. Please select a valid option (1-6).");
+                                    Console.WriteLine("Invalid choice. Please select a valid option (1-13).");
+                                    Console.WriteLine("Press Enter to continue...");
+                                    Console.ReadLine();
                                     break;
-
-
                             }
-
-
-
-
-
                         }
 
+                        Console.WriteLine("Press any key to return to the main menu...");
+                        Console.ReadKey();
                         break;
+               
+
+   
+
+
+                    
 
                     case "2":
                         {
                             Console.Clear();
                             Console.WriteLine("Solving with Revised Primal Simplex Algorithm...");
 
-                            // Work on fresh copies so we don't mutate the parser's lists
-                            objective = new List<double>(inputFileParser.ObjectiveCoefficients);
-                            constraints = inputFileParser.Constraints
-                                .Select(c => new InputFileParser.Constraint(new List<double>(c.Coefficients), c.Relation, c.RHS))
+                            // Fresh copies so we don't mutate the parser state
+                            var objective2 = new List<double>(inputFileParser.ObjectiveCoefficients);
+                            var constraints2 = inputFileParser.Constraints
+                                .Select(c => new InputFileParser.Constraint(
+                                    new List<double>(c.Coefficients), c.Relation, c.RHS))
                                 .ToList();
 
-                            // show once on screen
+                            // Add x_j ≤ 1 bounds for variables marked as "bin" or already having ≤ 1 in sign restrictions
+                            AddUpperBoundConstraints(objective2.Count, inputFileParser.SignRestrictions, constraints2);
+
+                            // Show the canonical form of what we're about to solve
                             CanonicalFormConverter.DisplayCanonicalForm(
                                 inputFileParser.ProblemType,
-                                objective,
-                                constraints,
+                                objective2,
+                                constraints2,
                                 inputFileParser.SignRestrictions);
 
+                            // Use the NEW class that always prints T-* style
+                            var revisedSolver = new LPR_381_Group_V22.Simplex.RevisedPrimalSimplexSolver(
+                                objective2, constraints2, isMinimization);
 
+                            revisedSolver.Solve();
 
-                            // Determine minimization correctly (default: MAX if null/unknown)
-                            bool isMin = string.Equals(inputFileParser.ProblemType, "min", StringComparison.OrdinalIgnoreCase);
+                            foreach (var snap in revisedSolver.IterationSnapshots)
+                                Console.WriteLine(snap);
 
-
-                            AddUpperBoundConstraints(objective.Count, inputFileParser.SignRestrictions, constraints);
-
-
-                            var revisedSolver = new RevisedPrimalSimplexSolver(objective, constraints, isMin);
-
-                            try
-                            {
-                                revisedSolver.Solve();
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine("\n✖ Error while solving with Revised Simplex:");
-                                Console.WriteLine(ex.Message);
-                                Console.WriteLine("\nPress any key to return to the main menu...");
-                                Console.ReadKey();
-                                break;
-                            }
-
-                            
-                            if (revisedSolver.IterationSnapshots.Count > 0)
-                            {
-                                Console.WriteLine("\n=== Iterations ===");
-                                foreach (var snap in revisedSolver.IterationSnapshots)
-                                {
-                                    Console.WriteLine(snap);
-                                    Console.WriteLine("Press any key to see next iteration...");
-                                    Console.ReadKey();
-                                }
-                            }
-
-                            // Results (3-decimals only when needed)
-                            Console.WriteLine($"\nOptimal Objective Value (Z*): {NumFormat.N3(revisedSolver.FinalZ)}");
-                            Console.WriteLine("Decision Variables:");
-                            for (int i = 0; i < revisedSolver.SolutionVector.Count; i++)
-                                Console.WriteLine($"x{i + 1} = {NumFormat.N3(revisedSolver.SolutionVector[i])}");
-
-                            // Persist results
-                            solverUsed = "Revised Primal Simplex Algorithm";
+                            solverUsed = "Revised Primal Simplex Algorithm (T-*)";
                             OutputFileWrite.WriteFullResults(
-                                 "data/output_results.txt",
-                                 solverUsed: "Revised Primal Simplex Algorithm",
-                                 problemType: inputFileParser.ProblemType, // <- IMPORTANT: pass the actual "min"/"max"
-                                 objectiveCoefficients: objective,
-                                 constraints: constraints,
-                                 signRestrictions: inputFileParser.SignRestrictions,
-                                 iterationSnapshots: revisedSolver.IterationSnapshots,
-                                 finalZ: revisedSolver.FinalZ,
-                                 solutionVector: revisedSolver.SolutionVector
-                             );
+                                "data/output_results.txt",
+                                solverUsed,
+                                inputFileParser.ProblemType,
+                                objective2,
+                                constraints2,
+                                inputFileParser.SignRestrictions,
+                                revisedSolver.IterationSnapshots,
+                                revisedSolver.FinalZ,
+                                revisedSolver.SolutionVector
+                            );
 
                             Console.WriteLine("\nAll results have been saved to 'output_results.txt'.");
+                            Console.WriteLine("Press any key to return to the main menu...");
+                            Console.ReadKey();
                             break;
                         }
 
@@ -477,7 +441,7 @@ namespace LPR_381_Group_V22
                             Console.WriteLine($"  Item {i + 1}: Value={values[i]}, Weight={weights[i]}");
                         Console.WriteLine();
 
-                        var solver = new KnapsackBranchBoundSolver(
+                        var solver = new KnapsackBranchBoundSimplex(
                             capacity,
                             weights.Select(w => (double)w).ToArray(),
                             values.Select(v => (double)v).ToArray()

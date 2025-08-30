@@ -63,6 +63,7 @@
     <Compile Include="Simplex\PrimalSimplexSolver.cs" />
     <Compile Include="Simplex\PrimalSimplexSolver2.cs" />
     <Compile Include="Simplex\RevisedPrimalSimplexSolver.cs" />
+    <Compile Include="Simplex\RevisedSimplexSolver1.cs" />
     <Compile Include="Utilities\CanonicalFormConverter.cs" />
     <Compile Include="Utilities\TableIterationFormater.cs" />
   </ItemGroup>
